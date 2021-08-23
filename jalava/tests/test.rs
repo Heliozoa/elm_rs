@@ -4,12 +4,14 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use jalava::Elm;
 use serde::Serialize;
 use std::{
+    borrow::Cow,
     cell::*,
     collections::*,
     num::*,
     path::*,
     rc::Rc,
     sync::{atomic::*, *},
+    time::{Duration, SystemTime},
 };
 use uuid::Uuid;
 
@@ -25,6 +27,9 @@ struct Tuple(u32, Vec<Option<Vec<f64>>>);
 #[derive(Serialize, Elm)]
 struct Record<'a> {
     borrow: &'a bool,
+    one_tuple: (bool,),
+    two_tuple: (bool, bool),
+    three_tuple: (bool, bool, bool),
     mut_borrow: &'a mut bool,
     arc: Arc<bool>,
     abool: AtomicBool,
@@ -42,6 +47,8 @@ struct Record<'a> {
     bset: BTreeSet<bool>,
     b: Box<bool>,
     cell: Cell<bool>,
+    cow: Cow<'a, str>,
+    duration: Duration,
     map: HashMap<String, bool>,
     set: HashSet<bool>,
     list: LinkedList<bool>,
@@ -64,8 +71,11 @@ struct Record<'a> {
     pathbuf: PathBuf,
     rc: Rc<bool>,
     refcell: RefCell<bool>,
+    result_ok: Result<bool, bool>,
+    result_err: Result<bool, bool>,
     rwlock: RwLock<bool>,
     string: String,
+    system_time: SystemTime,
     vec: Vec<bool>,
     slice: &'a [bool],
     array: [bool; 2],
@@ -96,7 +106,7 @@ enum CustomType<'a> {
     V1,
     V2(&'a Unit),
     V3(&'a Newtype, &'a Tuple),
-    V4 { r: &'a Record<'a> },
+    V4 { r: &'a Unit },
 }
 
 #[test]
@@ -135,6 +145,9 @@ fn test() {
     let record = Record {
         borrow: &true,
         mut_borrow: &mut false,
+        one_tuple: (true,),
+        two_tuple: (true, false),
+        three_tuple: (true, false, true),
         arc: Arc::new(true),
         abool: AtomicBool::new(false),
         au8: AtomicU8::new(0),
@@ -151,6 +164,8 @@ fn test() {
         bset,
         b: Box::new(true),
         cell: Cell::new(false),
+        cow: Cow::Borrowed("cow"),
+        duration: Duration::from_nanos(1_000_000_123),
         map,
         set,
         list,
@@ -173,8 +188,11 @@ fn test() {
         pathbuf: PathBuf::from("pathbuf"),
         rc: Rc::new(true),
         refcell: RefCell::new(false),
+        result_ok: Ok(true),
+        result_err: Err(false),
         rwlock: RwLock::new(true),
         string: "string".to_string(),
+        system_time: SystemTime::UNIX_EPOCH,
         vec: vec![false, true],
         slice: &[false, true],
         array: [true, false],
@@ -202,91 +220,118 @@ fn test() {
     assert_json(
         &record,
         r#"{
-  "abool": false,
-  "ai16": 6,
-  "ai32": 7,
-  "ai64": 8,
-  "ai8": 5,
-  "aisize": 9,
-  "arc": true,
-  "array": [
+  "borrow": true,
+  "one_tuple": [
+    true
+  ],
+  "two_tuple": [
     true,
     false
   ],
+  "three_tuple": [
+    true,
+    false,
+    true
+  ],
+  "mut_borrow": false,
+  "arc": true,
+  "abool": false,
+  "au8": 0,
   "au16": 1,
   "au32": 2,
   "au64": 3,
-  "au8": 0,
   "ausize": 4,
-  "b": true,
+  "ai8": 5,
+  "ai16": 6,
+  "ai32": 7,
+  "ai64": 8,
+  "aisize": 9,
   "bmap": {
     "a": true
   },
-  "borrow": true,
   "bset": [
     true
   ],
+  "b": true,
   "cell": false,
-  "dt": "2021-08-23T21:47:20.000001234Z",
+  "cow": "cow",
+  "duration": {
+    "secs": 1,
+    "nanos": 123
+  },
+  "map": {
+    "b": false
+  },
+  "set": [
+    false
+  ],
   "list": [
     true,
     false
   ],
-  "map": {
-    "b": false
-  },
-  "mut_borrow": false,
   "mutex": true,
-  "nd": "2020-10-01",
-  "ndt": "2021-08-23T21:47:20.000001234",
-  "ni128": 20,
-  "ni16": 17,
-  "ni32": 18,
-  "ni64": 19,
-  "ni8": 16,
-  "nisize": 21,
-  "none": null,
-  "nt": "11:22:33",
-  "nu128": 14,
+  "nu8": 10,
   "nu16": 11,
   "nu32": 12,
   "nu64": 13,
-  "nu8": 10,
+  "nu128": 14,
   "nusize": 15,
+  "ni8": 16,
+  "ni16": 17,
+  "ni32": 18,
+  "ni64": 19,
+  "ni128": 20,
+  "nisize": 21,
+  "some": false,
+  "none": null,
   "path": "path",
   "pathbuf": "pathbuf",
-  "pf32": 34.349998474121094,
-  "pf64": 36.37,
-  "pi128": 32,
-  "pi16": 29,
-  "pi32": 30,
-  "pi64": 31,
-  "pi8": 28,
-  "pisize": 33,
-  "pu128": 26,
-  "pu16": 23,
-  "pu32": 24,
-  "pu64": 25,
-  "pu8": 22,
-  "pusize": 27,
   "rc": true,
   "refcell": false,
+  "result_ok": {
+    "Ok": true
+  },
+  "result_err": {
+    "Err": false
+  },
   "rwlock": true,
-  "set": [
-    false
+  "string": "string",
+  "system_time": {
+    "secs_since_epoch": 0,
+    "nanos_since_epoch": 0
+  },
+  "vec": [
+    false,
+    true
   ],
   "slice": [
     false,
     true
   ],
-  "some": false,
+  "array": [
+    true,
+    false
+  ],
+  "pu8": 22,
+  "pu16": 23,
+  "pu32": 24,
+  "pu64": 25,
+  "pu128": 26,
+  "pusize": 27,
+  "pi8": 28,
+  "pi16": 29,
+  "pi32": 30,
+  "pi64": 31,
+  "pi128": 32,
+  "pisize": 33,
+  "pf32": 34.349998474121094,
+  "pf64": 36.37,
   "ss": "str",
-  "string": "string",
   "uuid": "be81c148-3ebe-4e0b-949a-e4a706f4dbde",
-  "vec": [
-    false,
-    true
-  ]
+  "nt": "11:22:33",
+  "nd": "2020-10-01",
+  "ndt": "2021-08-23T21:47:20.000001234",
+  "dt": "2021-08-23T21:47:20.000001234Z"
 }"#,
     );
 
@@ -316,103 +361,20 @@ fn test() {
 }"#,
     );
     assert_json(
-        CustomType::V4 { r: &record },
+        CustomType::V4 { r: &unit },
         r#"{
   "V4": {
-    "r": {
-      "borrow": true,
-      "mut_borrow": false,
-      "arc": true,
-      "abool": false,
-      "au8": 0,
-      "au16": 1,
-      "au32": 2,
-      "au64": 3,
-      "ausize": 4,
-      "ai8": 5,
-      "ai16": 6,
-      "ai32": 7,
-      "ai64": 8,
-      "aisize": 9,
-      "bmap": {
-        "a": true
-      },
-      "bset": [
-        true
-      ],
-      "b": true,
-      "cell": false,
-      "map": {
-        "b": false
-      },
-      "set": [
-        false
-      ],
-      "list": [
-        true,
-        false
-      ],
-      "mutex": true,
-      "nu8": 10,
-      "nu16": 11,
-      "nu32": 12,
-      "nu64": 13,
-      "nu128": 14,
-      "nusize": 15,
-      "ni8": 16,
-      "ni16": 17,
-      "ni32": 18,
-      "ni64": 19,
-      "ni128": 20,
-      "nisize": 21,
-      "some": false,
-      "none": null,
-      "path": "path",
-      "pathbuf": "pathbuf",
-      "rc": true,
-      "refcell": false,
-      "rwlock": true,
-      "string": "string",
-      "vec": [
-        false,
-        true
-      ],
-      "slice": [
-        false,
-        true
-      ],
-      "array": [
-        true,
-        false
-      ],
-      "pu8": 22,
-      "pu16": 23,
-      "pu32": 24,
-      "pu64": 25,
-      "pu128": 26,
-      "pusize": 27,
-      "pi8": 28,
-      "pi16": 29,
-      "pi32": 30,
-      "pi64": 31,
-      "pi128": 32,
-      "pisize": 33,
-      "pf32": 34.349998474121094,
-      "pf64": 36.37,
-      "ss": "str",
-      "uuid": "be81c148-3ebe-4e0b-949a-e4a706f4dbde",
-      "nt": "11:22:33",
-      "nd": "2020-10-01",
-      "ndt": "2021-08-23T21:47:20.000001234",
-      "dt": "2021-08-23T21:47:20.000001234Z"
-    }
+    "r": null
   }
 }"#,
     );
 
     // generate bindings
     let mut file = std::fs::File::create("./tests/elm/src/Bindings.elm").unwrap();
-    jalava::export!(&mut file, Unit, Newtype, Tuple, Record, CustomType);
+    jalava::export!(
+        &mut file, Unit, Newtype, Tuple, Record, CustomType, Duration, SystemTime, Result<bool, bool>
+    )
+    .unwrap();
 
     // run elm-test
     let out = std::process::Command::new("elm-test")

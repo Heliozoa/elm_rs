@@ -57,6 +57,9 @@ tupleDecoder =
 
 type alias Record =
     { borrow : Bool
+    , one_tuple : Bool
+    , two_tuple : ( Bool, Bool )
+    , three_tuple : ( Bool, Bool, Bool )
     , mut_borrow : Bool
     , arc : Bool
     , abool : Bool
@@ -74,6 +77,8 @@ type alias Record =
     , bset : List (Bool)
     , b : Bool
     , cell : Bool
+    , cow : String
+    , duration : Duration
     , map : Dict String (Bool)
     , set : List (Bool)
     , list : List (Bool)
@@ -96,8 +101,11 @@ type alias Record =
     , pathbuf : String
     , rc : Bool
     , refcell : Bool
+    , result_ok : Result Bool Bool
+    , result_err : Result Bool Bool
     , rwlock : Bool
     , string : String
+    , system_time : SystemTime
     , vec : List (Bool)
     , slice : List (Bool)
     , array : List (Bool)
@@ -128,6 +136,9 @@ recordEncoder : Record -> Json.Encode.Value
 recordEncoder struct =
     Json.Encode.object
         [ ( "borrow", (Json.Encode.bool) struct.borrow )
+        , ( "one_tuple", (\( a ) -> Json.Encode.list identity [ Json.Encode.bool a ]) struct.one_tuple )
+        , ( "two_tuple", (\( a, b) -> Json.Encode.list identity [ Json.Encode.bool a, Json.Encode.bool b ]) struct.two_tuple )
+        , ( "three_tuple", (\( a, b, c ) -> Json.Encode.list identity [ Json.Encode.bool a, Json.Encode.bool b, Json.Encode.bool c ]) struct.three_tuple )
         , ( "mut_borrow", (Json.Encode.bool) struct.mut_borrow )
         , ( "arc", (Json.Encode.bool) struct.arc )
         , ( "abool", (Json.Encode.bool) struct.abool )
@@ -145,6 +156,8 @@ recordEncoder struct =
         , ( "bset", (Json.Encode.list (Json.Encode.bool)) struct.bset )
         , ( "b", (Json.Encode.bool) struct.b )
         , ( "cell", (Json.Encode.bool) struct.cell )
+        , ( "cow", (Json.Encode.string) struct.cow )
+        , ( "duration", (durationEncoder) struct.duration )
         , ( "map", (Json.Encode.dict identity (Json.Encode.bool)) struct.map )
         , ( "set", (Json.Encode.list (Json.Encode.bool)) struct.set )
         , ( "list", (Json.Encode.list (Json.Encode.bool)) struct.list )
@@ -167,8 +180,11 @@ recordEncoder struct =
         , ( "pathbuf", (Json.Encode.string) struct.pathbuf )
         , ( "rc", (Json.Encode.bool) struct.rc )
         , ( "refcell", (Json.Encode.bool) struct.refcell )
+        , ( "result_ok", (resultEncoder) struct.result_ok )
+        , ( "result_err", (resultEncoder) struct.result_err )
         , ( "rwlock", (Json.Encode.bool) struct.rwlock )
         , ( "string", (Json.Encode.string) struct.string )
+        , ( "system_time", (systemTimeEncoder) struct.system_time )
         , ( "vec", (Json.Encode.list (Json.Encode.bool)) struct.vec )
         , ( "slice", (Json.Encode.list (Json.Encode.bool)) struct.slice )
         , ( "array", (Json.Encode.list (Json.Encode.bool)) struct.array )
@@ -199,6 +215,9 @@ recordDecoder : Json.Decode.Decoder Record
 recordDecoder =
     Json.Decode.succeed Record
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "borrow" (Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "one_tuple" ((Json.Decode.index 0 (Json.Decode.bool)))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "two_tuple" (Json.Decode.map2 (\a b -> ( a, b )) (Json.Decode.index 0 (Json.Decode.bool)) (Json.Decode.index 1 (Json.Decode.bool)))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "three_tuple" (Json.Decode.map3 (\a b c -> ( a, b, c )) (Json.Decode.index 0 (Json.Decode.bool)) (Json.Decode.index 1 (Json.Decode.bool)) (Json.Decode.index 2 (Json.Decode.bool)))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "mut_borrow" (Json.Decode.bool)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "arc" (Json.Decode.bool)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "abool" (Json.Decode.bool)))
@@ -216,6 +235,8 @@ recordDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "bset" (Json.Decode.list (Json.Decode.bool))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "b" (Json.Decode.bool)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "cell" (Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "cow" (Json.Decode.string)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "duration" (durationDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "map" (Json.Decode.dict (Json.Decode.bool))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "set" (Json.Decode.list (Json.Decode.bool))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "list" (Json.Decode.list (Json.Decode.bool))))
@@ -238,8 +259,11 @@ recordDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pathbuf" (Json.Decode.string)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "rc" (Json.Decode.bool)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "refcell" (Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "result_ok" (resultDecoder)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "result_err" (resultDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "rwlock" (Json.Decode.bool)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "string" (Json.Decode.string)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "system_time" (systemTimeDecoder)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "vec" (Json.Decode.list (Json.Decode.bool))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "slice" (Json.Decode.list (Json.Decode.bool))))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "array" (Json.Decode.list (Json.Decode.bool))))
@@ -269,7 +293,7 @@ type CustomType
     = V1
     | V2 (Unit)
     | V3 (Newtype) (Tuple)
-    | V4 { r : Record }
+    | V4 { r : Unit }
 
 
 customTypeEncoder : CustomType -> Json.Encode.Value
@@ -285,7 +309,7 @@ customTypeEncoder enum =
             Json.Encode.object [ ( "V3", Json.Encode.list identity [ newtypeEncoder t0, tupleEncoder t1 ] ) ]
 
         V4 { r } ->
-            Json.Encode.object [ ( "V4", Json.Encode.object [ ( "r", recordEncoder r ) ] ) ]
+            Json.Encode.object [ ( "V4", Json.Encode.object [ ( "r", unitEncoder r ) ] ) ]
 
 
 customTypeDecoder : Json.Decode.Decoder CustomType
@@ -313,8 +337,66 @@ customTypeDecoder =
             )
         , Json.Decode.field "V4"
             (Json.Decode.succeed constructV4
-                |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "r" recordDecoder))
+                |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "r" unitDecoder))
             )
         ]
 
+
+type alias Duration =
+    { secs : Int
+    , nanos : Int
+    }
+
+
+durationEncoder : Duration -> Json.Encode.Value
+durationEncoder duration =
+    Json.Encode.object
+    [ ( "secs", Json.Encode.int duration.secs )
+    , ( "nanos", Json.Encode.int duration.nanos )
+    ]
+
+
+durationDecoder : Json.Decode.Decoder Duration
+durationDecoder =
+    Json.Decode.succeed Duration
+    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "secs" (Json.Decode.int)))
+    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nanos" (Json.Decode.int)))
+
+
+type alias SystemTime =
+    { secs_since_epoch : Int
+    , nanos_since_epoch : Int
+    }
+
+
+systemTimeEncoder : SystemTime -> Json.Encode.Value
+systemTimeEncoder duration =
+    Json.Encode.object
+    [ ( "secs_since_epoch", Json.Encode.int duration.secs_since_epoch )
+    , ( "nanos_since_epoch", Json.Encode.int duration.nanos_since_epoch )
+    ]
+
+
+systemTimeDecoder : Json.Decode.Decoder SystemTime
+systemTimeDecoder =
+    Json.Decode.succeed SystemTime
+    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "secs_since_epoch" (Json.Decode.int)))
+    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nanos_since_epoch" (Json.Decode.int)))
+
+
+resultEncoder : (Result Bool Bool) -> Json.Encode.Value
+resultEncoder enum =
+    case enum of
+        Ok inner ->
+            Json.Encode.object [ ( "Ok", Json.Encode.bool inner ) ]
+
+        Err inner ->
+            Json.Encode.object [ ( "Err", Json.Encode.bool inner ) ]
+
+resultDecoder : Json.Decode.Decoder (Result Bool Bool)
+resultDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map Ok (Json.Decode.field "Ok" (Json.Decode.bool))
+        , Json.Decode.map Err (Json.Decode.field "Err" (Json.Decode.bool))
+        ]
 

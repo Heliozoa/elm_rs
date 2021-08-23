@@ -24,23 +24,26 @@ where
     }
 
     fn elm_definition() -> Option<String> {
-        T::elm_definition()
+        None
     }
 
     fn decoder_type() -> String {
-        T::decoder_type()
+        format!("(Json.Decode.index 0 ({}))", T::decoder_type(),)
     }
 
     fn decoder_definition() -> Option<String> {
-        T::decoder_definition()
+        None
     }
 
     fn encoder_type() -> String {
-        T::encoder_type()
+        format!(
+            "\\( a ) -> Json.Encode.list identity [ {} a ]",
+            T::encoder_type(),
+        )
     }
 
     fn encoder_definition() -> Option<String> {
-        T::encoder_definition()
+        None
     }
 }
 
@@ -117,9 +120,9 @@ where
     fn encoder_type() -> String {
         format!(
             "\\( a, b, c ) -> Json.Encode.list identity [ {} a, {} b, {} c ]",
-            T::elm_type(),
-            U::elm_type(),
-            V::elm_type(),
+            T::encoder_type(),
+            U::encoder_type(),
+            V::encoder_type(),
         )
     }
 
@@ -180,6 +183,158 @@ where
 
     fn encoder_definition() -> Option<String> {
         <[T]>::encoder_definition()
+    }
+}
+
+impl Elm for std::time::Duration {
+    fn elm_type() -> String {
+        "Duration".to_string()
+    }
+
+    fn elm_definition() -> Option<String> {
+        Some(
+            "\
+type alias Duration =
+    { secs : Int
+    , nanos : Int
+    }
+"
+            .to_string(),
+        )
+    }
+
+    fn decoder_type() -> String {
+        "durationDecoder".to_string()
+    }
+
+    fn decoder_definition() -> Option<String> {
+        Some(
+            r#"durationDecoder : Json.Decode.Decoder Duration
+durationDecoder =
+    Json.Decode.succeed Duration
+    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "secs" (Json.Decode.int)))
+    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nanos" (Json.Decode.int)))
+"#
+            .to_string(),
+        )
+    }
+
+    fn encoder_type() -> String {
+        "durationEncoder".to_string()
+    }
+
+    fn encoder_definition() -> Option<String> {
+        Some(
+            r#"durationEncoder : Duration -> Json.Encode.Value
+durationEncoder duration =
+    Json.Encode.object
+    [ ( "secs", Json.Encode.int duration.secs )
+    , ( "nanos", Json.Encode.int duration.nanos )
+    ]
+"#
+            .to_string(),
+        )
+    }
+}
+
+impl<T: Elm, E: Elm> Elm for Result<T, E> {
+    fn elm_type() -> String {
+        format!("Result {} {}", T::elm_type(), E::elm_type())
+    }
+
+    fn elm_definition() -> Option<String> {
+        None
+    }
+
+    fn decoder_type() -> String {
+        "resultDecoder".to_string()
+    }
+
+    fn decoder_definition() -> Option<String> {
+        Some(format!(
+            r#"resultDecoder : Json.Decode.Decoder (Result {} {})
+resultDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map Ok (Json.Decode.field "Ok" ({}))
+        , Json.Decode.map Err (Json.Decode.field "Err" ({}))
+        ]"#,
+            T::elm_type(),
+            E::elm_type(),
+            T::decoder_type(),
+            E::decoder_type()
+        ))
+    }
+
+    fn encoder_type() -> String {
+        "resultEncoder".to_string()
+    }
+
+    fn encoder_definition() -> Option<String> {
+        Some(format!(
+            r#"resultEncoder : (Result {} {}) -> Json.Encode.Value
+resultEncoder enum =
+    case enum of
+        Ok inner ->
+            Json.Encode.object [ ( "Ok", {} inner ) ]
+
+        Err inner ->
+            Json.Encode.object [ ( "Err", {} inner ) ]"#,
+            T::elm_type(),
+            E::elm_type(),
+            T::encoder_type(),
+            E::encoder_type()
+        ))
+    }
+}
+
+impl Elm for std::time::SystemTime {
+    fn elm_type() -> String {
+        "SystemTime".to_string()
+    }
+
+    fn elm_definition() -> Option<String> {
+        Some(
+            "\
+type alias SystemTime =
+    { secs_since_epoch : Int
+    , nanos_since_epoch : Int
+    }
+"
+            .to_string(),
+        )
+    }
+
+    fn decoder_type() -> String {
+        "systemTimeDecoder".to_string()
+    }
+
+    fn decoder_definition() -> Option<String> {
+        Some(
+            r#"systemTimeDecoder : Json.Decode.Decoder SystemTime
+systemTimeDecoder =
+    Json.Decode.succeed SystemTime
+    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "secs_since_epoch" (Json.Decode.int)))
+    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nanos_since_epoch" (Json.Decode.int)))
+"#
+            .to_string(),
+        )
+    }
+
+    fn encoder_type() -> String {
+        "systemTimeEncoder".to_string()
+    }
+
+    fn encoder_definition() -> Option<String> {
+        Some(
+            r#"systemTimeEncoder : SystemTime -> Json.Encode.Value
+systemTimeEncoder duration =
+    Json.Encode.object
+    [ ( "secs_since_epoch", Json.Encode.int duration.secs_since_epoch )
+    , ( "nanos_since_epoch", Json.Encode.int duration.nanos_since_epoch )
+    ]
+"#
+            .to_string(),
+        )
     }
 }
 
@@ -411,7 +566,6 @@ impl_builtin_container!(
 );
 impl_builtin_ptr!(Box<T>);
 impl_builtin_ptr!(std::cell::Cell<T>);
-// todo duration
 impl_builtin_map!(std::collections::HashMap<String,T>);
 impl_builtin_container!(
     std::collections::HashSet<T>,
@@ -517,14 +671,12 @@ impl_builtin!(
     "Json.Decode.string",
     "Json.Encode.string"
 );
-// todo phantomdata?
+// todo phantomdata
 impl_builtin_ptr!(std::rc::Rc<T>);
 impl_builtin_ptr!(std::cell::RefCell<T>);
-// todo result
 impl_builtin_ptr!(std::sync::RwLock<T>);
 // todo socketaddrs
 impl_builtin!(String, "String", "Json.Decode.string", "Json.Encode.string");
-// todo systemtime
 impl_builtin_container!(Vec<T>, "List", "Json.Decode.list", "Json.Encode.list");
 impl_builtin_container!([T], "List", "Json.Decode.list", "Json.Encode.list");
 impl_builtin!(bool, "Bool", "Json.Decode.bool", "Json.Encode.bool");

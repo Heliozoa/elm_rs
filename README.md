@@ -98,6 +98,7 @@ drawingEncoder struct =
 - [ ] Include definitions for the dependencies of exported types
 - [ ] Compatibility with serde attributes (e.g. `rename`)
 - [ ] Handle recursive data structures
+- [ ] Improved handling of generics
 
 ### License
 Licensed under either one of

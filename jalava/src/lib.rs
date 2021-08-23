@@ -7,7 +7,7 @@ pub use elm_form::{ElmForm, ElmFormField};
 #[macro_export]
 /// Writes an Elm module named Bindings to the target.
 macro_rules! export {
-    ($target: expr, $($type: path),*) => {
+    ($target: expr, $($type: ty),*) => {
         {
             fn _export(target: &mut impl std::io::Write) -> Result<(), std::io::Error> {
                 use std::io::Write;

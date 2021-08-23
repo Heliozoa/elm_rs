@@ -97,3 +97,4 @@ drawingEncoder struct =
 - [ ] Implement `Elm` for all std types supported by `serde::{Deserialize, Serialize}` where possible
 - [ ] Include definitions for the dependencies of exported types
 - [ ] Compatibility with serde attributes (e.g. `rename`)
+- [ ] Support decoding lists into an array
