@@ -97,3 +97,8 @@ drawingEncoder struct =
 - [ ] Implement `Elm` for all std types supported by `serde::{Deserialize, Serialize}` where possible
 - [ ] Include definitions for the dependencies of exported types
 - [ ] Compatibility with serde attributes (e.g. `rename`)
+
+### License
+Licensed under either one of
+- Apache License, Version 2.0
+- The MIT License
