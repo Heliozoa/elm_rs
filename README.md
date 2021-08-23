@@ -94,9 +94,12 @@ drawingEncoder struct =
 - [ ] Implement `ElmForm` and `ElmFormField` traits and derive macros to generate functions for requests using `Http.multipartBody`
 
 ### 0.1.1+ Roadmap
-- [ ] Implement `Elm` for all std types supported by `serde::{Deserialize, Serialize}` where possible
-- [ ] Include definitions for the dependencies of exported types
 - [ ] Compatibility with serde attributes (e.g. `rename`)
+- [ ] Include definitions for the dependencies of exported types
+- [ ] Implement `Elm` for all std types supported by `serde::{Deserialize, Serialize}` where possible
+  - [ ] IpAddr, Ipv4Addr, Ipv6Addr
+  - [ ] SocketAddr, SocketAddrV4, SocketAddrV6
+  - [ ] PhantomData
 - [ ] Handle recursive data structures
 - [ ] Improved handling of generics
 
