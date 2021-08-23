@@ -1,4 +1,4 @@
-Rust trait that makes it easy to generate Elm types, JSON encoders and decoders, and helpers for `Http.multipartBody` requests from your backend types.
+Automatically generate type definitions and JSON encoders and JSON decoders for your Elm frontend from your Rust backend types.
 
 For example, the following Rust types
 ```rust
