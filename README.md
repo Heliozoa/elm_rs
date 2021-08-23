@@ -91,9 +91,9 @@ drawingEncoder struct =
 
 ### 0.1.0 Roadmap
 - [x] Implement `Elm` trait and derive macro
-- [] Implement `ElmForm` and `ElmFormField` traits and derive macros to generate functions for requests using `Http.multipartBody`
+- [ ] Implement `ElmForm` and `ElmFormField` traits and derive macros to generate functions for requests using `Http.multipartBody`
 
 ### 0.1.1+ Roadmap
-- [] Implement `Elm` for all std types supported by `serde::{Deserialize, Serialize}` where possible
-- [] Include definitions for the dependencies of exported types
-- [] Compatibility with serde attributes (e.g. `rename`)
+- [ ] Implement `Elm` for all std types supported by `serde::{Deserialize, Serialize}` where possible
+- [ ] Include definitions for the dependencies of exported types
+- [ ] Compatibility with serde attributes (e.g. `rename`)
