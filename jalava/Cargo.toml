@@ -2,6 +2,8 @@
 name = "jalava"
 version = "0.1.0"
 edition = "2018"
+authors = ["Heliozoa <daniel.x.martinez@helsinki.fi>"]
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 jalava-derive = { path = "../jalava-derive" }
