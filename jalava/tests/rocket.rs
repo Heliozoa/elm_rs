@@ -1,7 +1,8 @@
 #![allow(dead_code)]
+#![allow(unused_variables)]
 
 use jalava::{Elm, ElmForm};
-use rocket::{config::Shutdown, form::Form, Config, Request};
+use rocket::{config::Shutdown, form::Form, log::LogLevel, Config, Request};
 use std::{
     collections::HashMap,
     num::*,
@@ -25,6 +26,7 @@ static ERROR: AtomicBool = AtomicBool::new(false);
 async fn rocket_test() {
     let config = Config {
         port: 8001,
+        log_level: LogLevel::Off,
         shutdown: Shutdown {
             ctrlc: false,
             ..Default::default()
@@ -48,7 +50,7 @@ async fn rocket_test() {
         .unwrap();
 
     loop {
-        println!("checking status, visit http://localhost:8000/src/Main.elm");
+        println!("checking status, visit http://localhost:8000/src/Main.elm to send form requests that the tests are expecting");
         if ERROR.load(Ordering::Relaxed) {
             panic!();
         }

@@ -15,9 +15,6 @@ use std::{
 use uuid::Uuid;
 
 fn assert_json<T: Serialize>(val: T, json: &str) {
-    let s = serde_json::to_string_pretty(&val).unwrap();
-    println!("{}", s);
-
     let ex: serde_json::Value = serde_json::from_str(json).unwrap();
     let ac = serde_json::to_value(&val).unwrap();
     assert_eq!(ex, ac);
@@ -389,7 +386,5 @@ fn json_test() {
         .current_dir("./tests/elm")
         .output()
         .unwrap();
-    println!("{}", String::from_utf8(out.stdout).unwrap());
-    println!("{}", String::from_utf8(out.stderr).unwrap());
     assert!(out.status.success());
 }

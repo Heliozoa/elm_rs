@@ -13,13 +13,13 @@ pub use self::{elm::Elm, json::ElmJson};
 /// Writes an Elm module to the target. Assumes `elm/json`, `elm/http` and `elm/file` are installed.
 ///
 /// # Example
-/// ```
-/// # #[derive(Elm, ElmJson)]
+/// ```no_run
+/// # #[derive(jalava::Elm, jalava::ElmJson)]
 /// # struct MyStruct { s: String }
-/// # #[derive(Elm, ElmForm)]
+/// # #[derive(jalava::Elm, jalava::ElmForm)]
 /// # struct MyForm { s: String }
 /// let mut file = std::fs::File::create("MyModule.elm").unwrap();
-/// export!("MyModule", &mut file, MyStruct; MyForm).unwrap();
+/// jalava::export!("MyModule", &mut file, MyStruct; MyForm).unwrap();
 /// ```
 macro_rules! export {
     ($name: expr, $target: expr $(, $json: ty)* $(; $($form: ty),* $(,)?)?) => {

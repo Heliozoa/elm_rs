@@ -6,9 +6,9 @@ Note that attributes that are used to configure `serde_json` or `#[derive(FromFo
 
 For example, the following Rust types
 ```rust
-use jalava::{Elm, ElmJson, ElmForm};
+use jalava::{Elm, ElmJson, ElmForm, ElmFormParts};
 
-#[derive(Elm, ElmJson, ElmForm)]
+#[derive(Elm, ElmJson, ElmFormParts)]
 enum Filetype {
     Jpeg,
     Png,
