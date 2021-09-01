@@ -1,10 +1,10 @@
-module BindingsTest exposing (..)
+module JsonBindingsTest exposing (..)
 
-import Bindings exposing (..)
-import Dict exposing (Dict)
+import Dict
 import Expect
 import Json.Decode exposing (decodeString)
 import Json.Encode exposing (..)
+import JsonBindings exposing (..)
 import Test exposing (..)
 
 

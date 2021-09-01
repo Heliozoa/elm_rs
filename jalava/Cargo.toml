@@ -4,15 +4,23 @@ version = "0.1.0"
 edition = "2018"
 authors = ["Heliozoa <daniel.x.martinez@helsinki.fi>"]
 license = "MIT OR Apache-2.0"
+readme = "../README.md"
+resolver = "2"
 
 [dependencies]
 jalava-derive = { path = "../jalava-derive" }
+
+# optional
 chrono = { version = "0.4", optional = true }
 rocket = { version = "0.5.0-rc.1", optional = true }
+time = { version = "0.2", optional = true }
 uuid = { version = "0.8", optional = true }
 
 [dev-dependencies]
 chrono = { version = "0.4", features = ["serde"] }
+once_cell = "1"
+rocket = "0.5.0-rc.1"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
+tokio = "1"
 uuid = { version = "0.8", features = ["serde"] }

@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "jalava",
+    "jalava-derive"
+]
+resolver = "2"

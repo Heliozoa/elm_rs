@@ -1,7 +1,6 @@
 #![allow(dead_code)]
-
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
-use jalava::Elm;
+use jalava::{Elm, ElmJson};
 use serde::Serialize;
 use std::{
     borrow::Cow,
@@ -15,16 +14,25 @@ use std::{
 };
 use uuid::Uuid;
 
-#[derive(Serialize, Elm)]
+fn assert_json<T: Serialize>(val: T, json: &str) {
+    let s = serde_json::to_string_pretty(&val).unwrap();
+    println!("{}", s);
+
+    let ex: serde_json::Value = serde_json::from_str(json).unwrap();
+    let ac = serde_json::to_value(&val).unwrap();
+    assert_eq!(ex, ac);
+}
+
+#[derive(Serialize, Elm, ElmJson)]
 struct Unit;
 
-#[derive(Serialize, Elm)]
+#[derive(Serialize, Elm, ElmJson)]
 struct Newtype(bool);
 
-#[derive(Serialize, Elm)]
+#[derive(Serialize, Elm, ElmJson)]
 struct Tuple(u32, Vec<Option<Vec<f64>>>);
 
-#[derive(Serialize, Elm)]
+#[derive(Serialize, Elm, ElmJson)]
 struct Record<'a> {
     borrow: &'a bool,
     one_tuple: (bool,),
@@ -101,7 +109,7 @@ struct Record<'a> {
     dt: DateTime<Utc>,
 }
 
-#[derive(Serialize, Elm)]
+#[derive(Serialize, Elm, ElmJson)]
 enum CustomType<'a> {
     V1,
     V2(&'a Unit),
@@ -110,7 +118,7 @@ enum CustomType<'a> {
 }
 
 #[test]
-fn test() {
+fn json_test() {
     // check serde_json's output, the same strings should be used in the Elm test
     let unit = Unit;
     assert_json(&unit, "null");
@@ -370,9 +378,9 @@ fn test() {
     );
 
     // generate bindings
-    let mut file = std::fs::File::create("./tests/elm/src/Bindings.elm").unwrap();
+    let mut file = std::fs::File::create("./tests/elm/src/JsonBindings.elm").unwrap();
     jalava::export!(
-        &mut file, Unit, Newtype, Tuple, Record, CustomType, Duration, SystemTime, Result<bool, bool>
+      "JsonBindings", &mut file, Unit, Newtype, Tuple, Record, CustomType, Duration, SystemTime, Result<bool, bool>
     )
     .unwrap();
 
@@ -384,13 +392,4 @@ fn test() {
     println!("{}", String::from_utf8(out.stdout).unwrap());
     println!("{}", String::from_utf8(out.stderr).unwrap());
     assert!(out.status.success());
-}
-
-fn assert_json<T: Serialize>(val: T, json: &str) {
-    let s = serde_json::to_string_pretty(&val).unwrap();
-    println!("{}", s);
-
-    let ex: serde_json::Value = serde_json::from_str(json).unwrap();
-    let ac = serde_json::to_value(&val).unwrap();
-    assert_eq!(ex, ac);
 }
