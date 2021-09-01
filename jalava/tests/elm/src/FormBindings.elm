@@ -7,6 +7,7 @@ import Json.Decode
 import Json.Encode
 import Dict exposing (Dict)
 import Http
+import File
 
 boolToString : Bool -> String
 boolToString b =

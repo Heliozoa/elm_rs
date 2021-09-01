@@ -3,9 +3,9 @@
 
 module JsonBindings exposing (..)
 
+import Dict exposing (Dict)
 import Json.Decode
 import Json.Encode
-import Dict exposing (Dict)
 
 
 type Unit
@@ -23,36 +23,36 @@ unitDecoder =
 
 
 type Newtype
-    = Newtype (Bool)
+    = Newtype Bool
 
 
 newtypeEncoder : Newtype -> Json.Encode.Value
 newtypeEncoder (Newtype inner) =
-    (Json.Encode.bool) inner
+    Json.Encode.bool inner
 
 
 newtypeDecoder : Json.Decode.Decoder Newtype
 newtypeDecoder =
-    Json.Decode.map Newtype (Json.Decode.bool)
+    Json.Decode.map Newtype Json.Decode.bool
 
 
 type Tuple
-    = Tuple (Int) (List (Maybe (List (Float))))
+    = Tuple Int (List (Maybe (List Float)))
 
 
 tupleEncoder : Tuple -> Json.Encode.Value
 tupleEncoder (Tuple t0 t1) =
     Json.Encode.list identity
-        [ (Json.Encode.int) t0
-        , (Json.Encode.list (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.list (Json.Encode.float)))) t1
+        [ Json.Encode.int t0
+        , Json.Encode.list (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.list Json.Encode.float)) t1
         ]
 
 
 tupleDecoder : Json.Decode.Decoder Tuple
 tupleDecoder =
     Json.Decode.succeed Tuple
-        |> Json.Decode.andThen (\x -> Json.Decode.index 0 (Json.Decode.int) |> Json.Decode.map x)
-        |> Json.Decode.andThen (\x -> Json.Decode.index 1 (Json.Decode.list (Json.Decode.nullable (Json.Decode.list (Json.Decode.float)))) |> Json.Decode.map x)
+        |> Json.Decode.andThen (\x -> Json.Decode.index 0 Json.Decode.int |> Json.Decode.map x)
+        |> Json.Decode.andThen (\x -> Json.Decode.index 1 (Json.Decode.list (Json.Decode.nullable (Json.Decode.list Json.Decode.float))) |> Json.Decode.map x)
 
 
 type alias Record =
@@ -73,15 +73,15 @@ type alias Record =
     , ai32 : Int
     , ai64 : Int
     , aisize : Int
-    , bmap : Dict String (Bool)
-    , bset : List (Bool)
+    , bmap : Dict String Bool
+    , bset : List Bool
     , b : Bool
     , cell : Bool
     , cow : String
     , duration : Duration
-    , map : Dict String (Bool)
-    , set : List (Bool)
-    , list : List (Bool)
+    , map : Dict String Bool
+    , set : List Bool
+    , list : List Bool
     , mutex : Bool
     , nu8 : Int
     , nu16 : Int
@@ -95,8 +95,8 @@ type alias Record =
     , ni64 : Int
     , ni128 : Int
     , nisize : Int
-    , some : Maybe (Bool)
-    , none : Maybe (Bool)
+    , some : Maybe Bool
+    , none : Maybe Bool
     , path : String
     , pathbuf : String
     , rc : Bool
@@ -106,9 +106,9 @@ type alias Record =
     , rwlock : Bool
     , string : String
     , system_time : SystemTime
-    , vec : List (Bool)
-    , slice : List (Bool)
-    , array : List (Bool)
+    , vec : List Bool
+    , slice : List Bool
+    , array : List Bool
     , pu8 : Int
     , pu16 : Int
     , pu32 : Int
@@ -135,164 +135,164 @@ type alias Record =
 recordEncoder : Record -> Json.Encode.Value
 recordEncoder struct =
     Json.Encode.object
-        [ ( "borrow", (Json.Encode.bool) struct.borrow )
-        , ( "one_tuple", (\( a ) -> Json.Encode.list identity [ Json.Encode.bool a ]) struct.one_tuple )
-        , ( "two_tuple", (\( a, b) -> Json.Encode.list identity [ Json.Encode.bool a, Json.Encode.bool b ]) struct.two_tuple )
+        [ ( "borrow", Json.Encode.bool struct.borrow )
+        , ( "one_tuple", (\a -> Json.Encode.list identity [ Json.Encode.bool a ]) struct.one_tuple )
+        , ( "two_tuple", (\( a, b ) -> Json.Encode.list identity [ Json.Encode.bool a, Json.Encode.bool b ]) struct.two_tuple )
         , ( "three_tuple", (\( a, b, c ) -> Json.Encode.list identity [ Json.Encode.bool a, Json.Encode.bool b, Json.Encode.bool c ]) struct.three_tuple )
-        , ( "mut_borrow", (Json.Encode.bool) struct.mut_borrow )
-        , ( "arc", (Json.Encode.bool) struct.arc )
-        , ( "abool", (Json.Encode.bool) struct.abool )
-        , ( "au8", (Json.Encode.int) struct.au8 )
-        , ( "au16", (Json.Encode.int) struct.au16 )
-        , ( "au32", (Json.Encode.int) struct.au32 )
-        , ( "au64", (Json.Encode.int) struct.au64 )
-        , ( "ausize", (Json.Encode.int) struct.ausize )
-        , ( "ai8", (Json.Encode.int) struct.ai8 )
-        , ( "ai16", (Json.Encode.int) struct.ai16 )
-        , ( "ai32", (Json.Encode.int) struct.ai32 )
-        , ( "ai64", (Json.Encode.int) struct.ai64 )
-        , ( "aisize", (Json.Encode.int) struct.aisize )
-        , ( "bmap", (Json.Encode.dict identity (Json.Encode.bool)) struct.bmap )
-        , ( "bset", (Json.Encode.list (Json.Encode.bool)) struct.bset )
-        , ( "b", (Json.Encode.bool) struct.b )
-        , ( "cell", (Json.Encode.bool) struct.cell )
-        , ( "cow", (Json.Encode.string) struct.cow )
-        , ( "duration", (durationEncoder) struct.duration )
-        , ( "map", (Json.Encode.dict identity (Json.Encode.bool)) struct.map )
-        , ( "set", (Json.Encode.list (Json.Encode.bool)) struct.set )
-        , ( "list", (Json.Encode.list (Json.Encode.bool)) struct.list )
-        , ( "mutex", (Json.Encode.bool) struct.mutex )
-        , ( "nu8", (Json.Encode.int) struct.nu8 )
-        , ( "nu16", (Json.Encode.int) struct.nu16 )
-        , ( "nu32", (Json.Encode.int) struct.nu32 )
-        , ( "nu64", (Json.Encode.int) struct.nu64 )
-        , ( "nu128", (Json.Encode.int) struct.nu128 )
-        , ( "nusize", (Json.Encode.int) struct.nusize )
-        , ( "ni8", (Json.Encode.int) struct.ni8 )
-        , ( "ni16", (Json.Encode.int) struct.ni16 )
-        , ( "ni32", (Json.Encode.int) struct.ni32 )
-        , ( "ni64", (Json.Encode.int) struct.ni64 )
-        , ( "ni128", (Json.Encode.int) struct.ni128 )
-        , ( "nisize", (Json.Encode.int) struct.nisize )
-        , ( "some", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.bool)) struct.some )
-        , ( "none", (Maybe.withDefault Json.Encode.null << Maybe.map (Json.Encode.bool)) struct.none )
-        , ( "path", (Json.Encode.string) struct.path )
-        , ( "pathbuf", (Json.Encode.string) struct.pathbuf )
-        , ( "rc", (Json.Encode.bool) struct.rc )
-        , ( "refcell", (Json.Encode.bool) struct.refcell )
-        , ( "result_ok", (resultEncoder) struct.result_ok )
-        , ( "result_err", (resultEncoder) struct.result_err )
-        , ( "rwlock", (Json.Encode.bool) struct.rwlock )
-        , ( "string", (Json.Encode.string) struct.string )
-        , ( "system_time", (systemTimeEncoder) struct.system_time )
-        , ( "vec", (Json.Encode.list (Json.Encode.bool)) struct.vec )
-        , ( "slice", (Json.Encode.list (Json.Encode.bool)) struct.slice )
-        , ( "array", (Json.Encode.list (Json.Encode.bool)) struct.array )
-        , ( "pu8", (Json.Encode.int) struct.pu8 )
-        , ( "pu16", (Json.Encode.int) struct.pu16 )
-        , ( "pu32", (Json.Encode.int) struct.pu32 )
-        , ( "pu64", (Json.Encode.int) struct.pu64 )
-        , ( "pu128", (Json.Encode.int) struct.pu128 )
-        , ( "pusize", (Json.Encode.int) struct.pusize )
-        , ( "pi8", (Json.Encode.int) struct.pi8 )
-        , ( "pi16", (Json.Encode.int) struct.pi16 )
-        , ( "pi32", (Json.Encode.int) struct.pi32 )
-        , ( "pi64", (Json.Encode.int) struct.pi64 )
-        , ( "pi128", (Json.Encode.int) struct.pi128 )
-        , ( "pisize", (Json.Encode.int) struct.pisize )
-        , ( "pf32", (Json.Encode.float) struct.pf32 )
-        , ( "pf64", (Json.Encode.float) struct.pf64 )
-        , ( "ss", (Json.Encode.string) struct.ss )
-        , ( "uuid", (Json.Encode.string) struct.uuid )
-        , ( "nt", (Json.Encode.string) struct.nt )
-        , ( "nd", (Json.Encode.string) struct.nd )
-        , ( "ndt", (Json.Encode.string) struct.ndt )
-        , ( "dt", (Json.Encode.string) struct.dt )
+        , ( "mut_borrow", Json.Encode.bool struct.mut_borrow )
+        , ( "arc", Json.Encode.bool struct.arc )
+        , ( "abool", Json.Encode.bool struct.abool )
+        , ( "au8", Json.Encode.int struct.au8 )
+        , ( "au16", Json.Encode.int struct.au16 )
+        , ( "au32", Json.Encode.int struct.au32 )
+        , ( "au64", Json.Encode.int struct.au64 )
+        , ( "ausize", Json.Encode.int struct.ausize )
+        , ( "ai8", Json.Encode.int struct.ai8 )
+        , ( "ai16", Json.Encode.int struct.ai16 )
+        , ( "ai32", Json.Encode.int struct.ai32 )
+        , ( "ai64", Json.Encode.int struct.ai64 )
+        , ( "aisize", Json.Encode.int struct.aisize )
+        , ( "bmap", Json.Encode.dict identity Json.Encode.bool struct.bmap )
+        , ( "bset", Json.Encode.list Json.Encode.bool struct.bset )
+        , ( "b", Json.Encode.bool struct.b )
+        , ( "cell", Json.Encode.bool struct.cell )
+        , ( "cow", Json.Encode.string struct.cow )
+        , ( "duration", durationEncoder struct.duration )
+        , ( "map", Json.Encode.dict identity Json.Encode.bool struct.map )
+        , ( "set", Json.Encode.list Json.Encode.bool struct.set )
+        , ( "list", Json.Encode.list Json.Encode.bool struct.list )
+        , ( "mutex", Json.Encode.bool struct.mutex )
+        , ( "nu8", Json.Encode.int struct.nu8 )
+        , ( "nu16", Json.Encode.int struct.nu16 )
+        , ( "nu32", Json.Encode.int struct.nu32 )
+        , ( "nu64", Json.Encode.int struct.nu64 )
+        , ( "nu128", Json.Encode.int struct.nu128 )
+        , ( "nusize", Json.Encode.int struct.nusize )
+        , ( "ni8", Json.Encode.int struct.ni8 )
+        , ( "ni16", Json.Encode.int struct.ni16 )
+        , ( "ni32", Json.Encode.int struct.ni32 )
+        , ( "ni64", Json.Encode.int struct.ni64 )
+        , ( "ni128", Json.Encode.int struct.ni128 )
+        , ( "nisize", Json.Encode.int struct.nisize )
+        , ( "some", (Maybe.withDefault Json.Encode.null << Maybe.map Json.Encode.bool) struct.some )
+        , ( "none", (Maybe.withDefault Json.Encode.null << Maybe.map Json.Encode.bool) struct.none )
+        , ( "path", Json.Encode.string struct.path )
+        , ( "pathbuf", Json.Encode.string struct.pathbuf )
+        , ( "rc", Json.Encode.bool struct.rc )
+        , ( "refcell", Json.Encode.bool struct.refcell )
+        , ( "result_ok", resultEncoder struct.result_ok )
+        , ( "result_err", resultEncoder struct.result_err )
+        , ( "rwlock", Json.Encode.bool struct.rwlock )
+        , ( "string", Json.Encode.string struct.string )
+        , ( "system_time", systemTimeEncoder struct.system_time )
+        , ( "vec", Json.Encode.list Json.Encode.bool struct.vec )
+        , ( "slice", Json.Encode.list Json.Encode.bool struct.slice )
+        , ( "array", Json.Encode.list Json.Encode.bool struct.array )
+        , ( "pu8", Json.Encode.int struct.pu8 )
+        , ( "pu16", Json.Encode.int struct.pu16 )
+        , ( "pu32", Json.Encode.int struct.pu32 )
+        , ( "pu64", Json.Encode.int struct.pu64 )
+        , ( "pu128", Json.Encode.int struct.pu128 )
+        , ( "pusize", Json.Encode.int struct.pusize )
+        , ( "pi8", Json.Encode.int struct.pi8 )
+        , ( "pi16", Json.Encode.int struct.pi16 )
+        , ( "pi32", Json.Encode.int struct.pi32 )
+        , ( "pi64", Json.Encode.int struct.pi64 )
+        , ( "pi128", Json.Encode.int struct.pi128 )
+        , ( "pisize", Json.Encode.int struct.pisize )
+        , ( "pf32", Json.Encode.float struct.pf32 )
+        , ( "pf64", Json.Encode.float struct.pf64 )
+        , ( "ss", Json.Encode.string struct.ss )
+        , ( "uuid", Json.Encode.string struct.uuid )
+        , ( "nt", Json.Encode.string struct.nt )
+        , ( "nd", Json.Encode.string struct.nd )
+        , ( "ndt", Json.Encode.string struct.ndt )
+        , ( "dt", Json.Encode.string struct.dt )
         ]
 
 
 recordDecoder : Json.Decode.Decoder Record
 recordDecoder =
     Json.Decode.succeed Record
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "borrow" (Json.Decode.bool)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "one_tuple" ((Json.Decode.index 0 (Json.Decode.bool)))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "two_tuple" (Json.Decode.map2 (\a b -> ( a, b )) (Json.Decode.index 0 (Json.Decode.bool)) (Json.Decode.index 1 (Json.Decode.bool)))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "three_tuple" (Json.Decode.map3 (\a b c -> ( a, b, c )) (Json.Decode.index 0 (Json.Decode.bool)) (Json.Decode.index 1 (Json.Decode.bool)) (Json.Decode.index 2 (Json.Decode.bool)))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "mut_borrow" (Json.Decode.bool)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "arc" (Json.Decode.bool)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "abool" (Json.Decode.bool)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "au8" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "au16" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "au32" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "au64" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ausize" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ai8" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ai16" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ai32" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ai64" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "aisize" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "bmap" (Json.Decode.dict (Json.Decode.bool))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "bset" (Json.Decode.list (Json.Decode.bool))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "b" (Json.Decode.bool)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "cell" (Json.Decode.bool)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "cow" (Json.Decode.string)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "duration" (durationDecoder)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "map" (Json.Decode.dict (Json.Decode.bool))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "set" (Json.Decode.list (Json.Decode.bool))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "list" (Json.Decode.list (Json.Decode.bool))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "mutex" (Json.Decode.bool)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nu8" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nu16" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nu32" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nu64" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nu128" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nusize" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ni8" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ni16" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ni32" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ni64" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ni128" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nisize" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "some" (Json.Decode.nullable (Json.Decode.bool))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "none" (Json.Decode.nullable (Json.Decode.bool))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "path" (Json.Decode.string)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pathbuf" (Json.Decode.string)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "rc" (Json.Decode.bool)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "refcell" (Json.Decode.bool)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "result_ok" (resultDecoder)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "result_err" (resultDecoder)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "rwlock" (Json.Decode.bool)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "string" (Json.Decode.string)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "system_time" (systemTimeDecoder)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "vec" (Json.Decode.list (Json.Decode.bool))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "slice" (Json.Decode.list (Json.Decode.bool))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "array" (Json.Decode.list (Json.Decode.bool))))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pu8" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pu16" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pu32" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pu64" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pu128" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pusize" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pi8" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pi16" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pi32" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pi64" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pi128" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pisize" (Json.Decode.int)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pf32" (Json.Decode.float)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pf64" (Json.Decode.float)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ss" (Json.Decode.string)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "uuid" (Json.Decode.string)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nt" (Json.Decode.string)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nd" (Json.Decode.string)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ndt" (Json.Decode.string)))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "dt" (Json.Decode.string)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "borrow" Json.Decode.bool))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "one_tuple" (Json.Decode.index 0 Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "two_tuple" (Json.Decode.map2 (\a b -> ( a, b )) (Json.Decode.index 0 Json.Decode.bool) (Json.Decode.index 1 Json.Decode.bool))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "three_tuple" (Json.Decode.map3 (\a b c -> ( a, b, c )) (Json.Decode.index 0 Json.Decode.bool) (Json.Decode.index 1 Json.Decode.bool) (Json.Decode.index 2 Json.Decode.bool))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "mut_borrow" Json.Decode.bool))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "arc" Json.Decode.bool))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "abool" Json.Decode.bool))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "au8" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "au16" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "au32" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "au64" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ausize" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ai8" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ai16" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ai32" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ai64" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "aisize" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "bmap" (Json.Decode.dict Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "bset" (Json.Decode.list Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "b" Json.Decode.bool))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "cell" Json.Decode.bool))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "cow" Json.Decode.string))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "duration" durationDecoder))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "map" (Json.Decode.dict Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "set" (Json.Decode.list Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "list" (Json.Decode.list Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "mutex" Json.Decode.bool))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nu8" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nu16" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nu32" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nu64" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nu128" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nusize" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ni8" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ni16" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ni32" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ni64" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ni128" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nisize" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "some" (Json.Decode.nullable Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "none" (Json.Decode.nullable Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "path" Json.Decode.string))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pathbuf" Json.Decode.string))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "rc" Json.Decode.bool))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "refcell" Json.Decode.bool))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "result_ok" resultDecoder))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "result_err" resultDecoder))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "rwlock" Json.Decode.bool))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "string" Json.Decode.string))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "system_time" systemTimeDecoder))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "vec" (Json.Decode.list Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "slice" (Json.Decode.list Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "array" (Json.Decode.list Json.Decode.bool)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pu8" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pu16" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pu32" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pu64" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pu128" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pusize" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pi8" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pi16" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pi32" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pi64" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pi128" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pisize" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pf32" Json.Decode.float))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "pf64" Json.Decode.float))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ss" Json.Decode.string))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "uuid" Json.Decode.string))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nt" Json.Decode.string))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nd" Json.Decode.string))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "ndt" Json.Decode.string))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "dt" Json.Decode.string))
 
 
 type CustomType
     = V1
-    | V2 (Unit)
-    | V3 (Newtype) (Tuple)
+    | V2 Unit
+    | V3 Newtype Tuple
     | V4 { r : Unit }
 
 
@@ -329,11 +329,11 @@ customTypeDecoder =
                         Json.Decode.fail "invalid enum variant"
             )
             Json.Decode.string
-        , Json.Decode.map V2 (Json.Decode.field "V2" (unitDecoder))
+        , Json.Decode.map V2 (Json.Decode.field "V2" unitDecoder)
         , Json.Decode.field "V3"
             (Json.Decode.succeed V3
-                |> Json.Decode.andThen (\x -> Json.Decode.index 0 (newtypeDecoder) |> Json.Decode.map x)
-                |> Json.Decode.andThen (\x -> Json.Decode.index 1 (tupleDecoder) |> Json.Decode.map x)
+                |> Json.Decode.andThen (\x -> Json.Decode.index 0 newtypeDecoder |> Json.Decode.map x)
+                |> Json.Decode.andThen (\x -> Json.Decode.index 1 tupleDecoder |> Json.Decode.map x)
             )
         , Json.Decode.field "V4"
             (Json.Decode.succeed constructV4
@@ -351,16 +351,16 @@ type alias Duration =
 durationEncoder : Duration -> Json.Encode.Value
 durationEncoder duration =
     Json.Encode.object
-    [ ( "secs", Json.Encode.int duration.secs )
-    , ( "nanos", Json.Encode.int duration.nanos )
-    ]
+        [ ( "secs", Json.Encode.int duration.secs )
+        , ( "nanos", Json.Encode.int duration.nanos )
+        ]
 
 
 durationDecoder : Json.Decode.Decoder Duration
 durationDecoder =
     Json.Decode.succeed Duration
-    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "secs" (Json.Decode.int)))
-    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nanos" (Json.Decode.int)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "secs" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nanos" Json.Decode.int))
 
 
 type alias SystemTime =
@@ -372,19 +372,19 @@ type alias SystemTime =
 systemTimeEncoder : SystemTime -> Json.Encode.Value
 systemTimeEncoder duration =
     Json.Encode.object
-    [ ( "secs_since_epoch", Json.Encode.int duration.secs_since_epoch )
-    , ( "nanos_since_epoch", Json.Encode.int duration.nanos_since_epoch )
-    ]
+        [ ( "secs_since_epoch", Json.Encode.int duration.secs_since_epoch )
+        , ( "nanos_since_epoch", Json.Encode.int duration.nanos_since_epoch )
+        ]
 
 
 systemTimeDecoder : Json.Decode.Decoder SystemTime
 systemTimeDecoder =
     Json.Decode.succeed SystemTime
-    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "secs_since_epoch" (Json.Decode.int)))
-    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nanos_since_epoch" (Json.Decode.int)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "secs_since_epoch" Json.Decode.int))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nanos_since_epoch" Json.Decode.int))
 
 
-resultEncoder : (Result Bool Bool) -> Json.Encode.Value
+resultEncoder : Result Bool Bool -> Json.Encode.Value
 resultEncoder enum =
     case enum of
         Ok inner ->
@@ -393,10 +393,10 @@ resultEncoder enum =
         Err inner ->
             Json.Encode.object [ ( "Err", Json.Encode.bool inner ) ]
 
+
 resultDecoder : Json.Decode.Decoder (Result Bool Bool)
 resultDecoder =
     Json.Decode.oneOf
-        [ Json.Decode.map Ok (Json.Decode.field "Ok" (Json.Decode.bool))
-        , Json.Decode.map Err (Json.Decode.field "Err" (Json.Decode.bool))
+        [ Json.Decode.map Ok (Json.Decode.field "Ok" Json.Decode.bool)
+        , Json.Decode.map Err (Json.Decode.field "Err" Json.Decode.bool)
         ]
-

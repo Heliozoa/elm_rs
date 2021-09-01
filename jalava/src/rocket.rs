@@ -68,7 +68,7 @@ macro_rules! impl_stringpart {
         impl ElmFormParts for $ty {
             fn form_parts_inner(field: &str, path: &str, _recursion: u32) -> String {
                 format!(
-                    r#"[ Http.stringPart "{}" ({} {}) ]"#,
+                    r#"[ Http.stringPart ("{}") ({} {}) ]"#,
                     field, $to_string, path
                 )
             }
