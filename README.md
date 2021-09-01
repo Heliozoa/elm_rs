@@ -129,6 +129,7 @@ prepareDrawing form =
 - [ ] Handle recursive types
 - [ ] Handle generic types
 - [ ] Improve generated code
+- [ ] Attributes for controlling the name of the Elm type etc.
 
 ### License
 Licensed under either one of

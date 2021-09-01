@@ -3,6 +3,8 @@
 pub use jalava_derive::{ElmForm, ElmFormParts};
 use rocket::fs::TempFile;
 
+use crate::Elm;
+
 /// Used to create multipart requests to a Rocket server.
 pub trait ElmForm {
     /// A function that creates a Http.Body from the corresponding Elm type.
@@ -22,6 +24,16 @@ pub trait ElmFormParts {
     }
 
     fn to_string_definition() -> Option<String> {
+        None
+    }
+}
+
+impl Elm for TempFile<'_> {
+    fn elm_type() -> String {
+        "File".to_string()
+    }
+
+    fn elm_definition() -> Option<String> {
         None
     }
 }
@@ -101,6 +113,8 @@ impl_stringpart!(time::Date, "identity");
 impl_stringpart!(time::Time, "identity");
 #[cfg(feature = "time")]
 impl_stringpart!(time::PrimitiveDateTime, "identity");
+#[cfg(feature = "uuid")]
+impl_stringpart!(uuid::Uuid, "identity");
 
 macro_rules! impl_dict {
     ($ty:ty) => {

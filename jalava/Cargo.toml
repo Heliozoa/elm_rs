@@ -24,3 +24,6 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 tokio = "1"
 uuid = { version = "0.8", features = ["serde"] }
+
+[package.metadata.docs.rs]
+all-features = true
