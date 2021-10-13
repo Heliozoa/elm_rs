@@ -30,7 +30,7 @@ pub trait ElmFormParts {
 
 impl Elm for TempFile<'_> {
     fn elm_type() -> String {
-        "File".to_string()
+        "File.File".to_string()
     }
 
     fn elm_definition() -> Option<String> {
@@ -154,3 +154,10 @@ impl_dict!(i128);
 impl_dict!(isize);
 impl_dict!(f32);
 impl_dict!(f64);
+
+#[cfg(feature = "chrono")]
+impl<T: chrono::TimeZone> ElmFormParts for chrono::DateTime<T> {
+    fn form_parts_inner(field: &str, path: &str, _recursion: u32) -> String {
+        format!(r#"[ Http.stringPart ("{}") {} ]"#, field, path)
+    }
+}
