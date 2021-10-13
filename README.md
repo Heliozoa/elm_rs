@@ -117,6 +117,7 @@ prepareDrawing form =
 - [x] Generate Elm types with the `Elm` trait and derive macro
 - [x] Generate JSON encoders and decoders with the `ElmJson` trait and derive macro
 - [x] Generate Elm functions that create multipart requests compatible with Rocket's multipart form parsing through the `rocket::{ElmForm, ElmFormField}` traits and derive macros
+- [x] Basic generic support
 
 ### Planned
 - [ ] Compatibility with serde attributes (e.g. `rename`)
@@ -127,8 +128,8 @@ prepareDrawing form =
   - [ ] SocketAddr, SocketAddrV4, SocketAddrV6
   - [ ] PhantomData
 - [ ] Handle recursive types
-- [ ] Handle generic types
 - [ ] Improve generated code
+- [ ] Improve generic support
 - [ ] Attributes for controlling the name of the Elm type etc.
 
 ### License

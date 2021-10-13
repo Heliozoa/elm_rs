@@ -29,8 +29,14 @@ fn intermediate_to_token_stream(
         TypeKind::Enum(vs) => enum_type(&elm_type, vs),
     };
 
+    // prepare a list of generics without any bounds
+    let mut without_bounds = generics.clone();
+    for p in without_bounds.type_params_mut() {
+        p.bounds = Default::default();
+    }
+
     quote! {
-        impl #generics jalava::Elm for #ident #generics {
+        impl #generics jalava::Elm for #ident #without_bounds {
             fn elm_type() -> String {
                 #elm_type.to_string()
             }

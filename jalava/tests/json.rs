@@ -373,13 +373,25 @@ fn json_test() {
   }
 }"#,
     );
+}
 
+#[derive(Serialize, Elm, ElmJson)]
+struct Generic<T: Elm + ElmJson>(T);
+
+#[test]
+fn generic() {
+    let generic = Generic("hi");
+    assert_json(&generic, "\"hi\"");
+}
+
+#[test]
+fn elm_test() {
     // generate bindings
     let mut file = std::fs::File::create("./tests/elm/src/JsonBindings.elm").unwrap();
     jalava::export!(
-      "JsonBindings", &mut file, Unit, Newtype, Tuple, Record, CustomType, Duration, SystemTime, Result<bool, bool>
-    )
-    .unwrap();
+    "JsonBindings", &mut file, Unit, Newtype, Tuple, Record, CustomType, Duration, SystemTime, Result<bool, bool>, Generic<&str>
+  )
+  .unwrap();
 
     // run elm-test
     let out = std::process::Command::new("elm-test")

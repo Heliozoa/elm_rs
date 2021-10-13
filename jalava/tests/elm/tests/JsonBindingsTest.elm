@@ -251,6 +251,11 @@ suite =
                 )
                 customTypeEncoder
                 customTypeDecoder
+        , describe "Generic" <|
+            endecoderTests "\"hi\""
+                (Generic "hi")
+                genericEncoder
+                genericDecoder
         ]
 
 

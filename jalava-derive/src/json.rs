@@ -31,8 +31,14 @@ fn intermediate_to_token_stream(
         TypeKind::Enum(vs) => enum_type(&elm_type, &decoder_type, &encoder_type, vs),
     };
 
+    // prepare a list of generics without any bounds
+    let mut without_bounds = generics.clone();
+    for p in without_bounds.type_params_mut() {
+        p.bounds = Default::default();
+    }
+
     quote! {
-        impl #generics jalava::ElmJson for #ident #generics {
+        impl #generics jalava::ElmJson for #ident #without_bounds {
             fn decoder_type() -> String {
                 #decoder_type.to_string()
             }
