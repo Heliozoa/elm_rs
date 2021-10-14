@@ -118,10 +118,17 @@ prepareDrawing form =
 - [x] Generate JSON encoders and decoders with the `ElmJson` trait and derive macro
 - [x] Generate Elm functions that create multipart requests compatible with Rocket's multipart form parsing through the `rocket::{ElmForm, ElmFormField}` traits and derive macros
 - [x] Basic generic support
+- [ ] Compatibility with serde container attributes
+  - [x] rename_all
+  - [ ] tag
+  - [ ] tag and content
+  - [ ] untagged
+  - [x] transparent
+- [ ] Compatibility with serde variant attributes
+- [ ] Compatibility with serde field attributes
+- [ ] Compatibility with rocket attributes (e.g. `field`)
 
 ### Planned
-- [ ] Compatibility with serde attributes (e.g. `rename`)
-- [ ] Compatibility with rocket attributes (e.g. `field`)
 - [ ] Optionally include definitions for the dependencies of exported types
 - [ ] Implement support for as many `serde::{Deserialize, Serialize}` std types as possible
   - [ ] IpAddr, Ipv4Addr, Ipv6Addr

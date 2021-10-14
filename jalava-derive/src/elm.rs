@@ -1,4 +1,4 @@
-use super::{EnumVariant, Intermediate, TypeKind};
+use super::{Attributes, EnumVariant, Intermediate, TypeKind};
 use heck::CamelCase;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
@@ -14,6 +14,7 @@ pub fn derive_elm(input: TokenStream) -> TokenStream {
 
 fn intermediate_to_token_stream(
     Intermediate {
+        attributes,
         ident,
         generics,
         kind,
@@ -25,8 +26,14 @@ fn intermediate_to_token_stream(
         TypeKind::Unit => unit(&elm_type),
         TypeKind::Newtype(ty) => newtype(&elm_type, ty),
         TypeKind::Tuple(ts) => tuple(&elm_type, ts),
-        TypeKind::Struct(fs) => struct_type(&elm_type, fs),
-        TypeKind::Enum(vs) => enum_type(&elm_type, vs),
+        TypeKind::Struct(mut fs) => {
+            if attributes.serde_transparent && fs.len() == 1 {
+                newtype(&elm_type, fs.pop().unwrap().1)
+            } else {
+                struct_type(&elm_type, fs, &attributes)
+            }
+        }
+        TypeKind::Enum(vs) => enum_type(&elm_type, vs, &attributes),
     };
 
     // prepare a list of generics without any bounds
@@ -77,8 +84,11 @@ type {elm_type}
     )}
 }
 
-fn struct_type(elm_type: &str, fs: Vec<(Ident, Type)>) -> TokenStream2 {
-    let (ids, ts): (Vec<_>, Vec<_>) = fs.into_iter().map(|(i, t)| (i.to_string(), t)).unzip();
+fn struct_type(elm_type: &str, fs: Vec<(Ident, Type)>, attributes: &Attributes) -> TokenStream2 {
+    let (ids, ts): (Vec<_>, Vec<_>) = fs
+        .into_iter()
+        .map(|(i, t)| (super::convert_case(i, attributes), t))
+        .unzip();
     quote! {format!("\
 type alias {elm_type} =
     {{ {fields}
@@ -89,7 +99,11 @@ type alias {elm_type} =
     )}
 }
 
-fn enum_type(elm_type: &str, vs: Vec<(Ident, EnumVariant)>) -> TokenStream2 {
+fn enum_type(
+    elm_type: &str,
+    vs: Vec<(Ident, EnumVariant)>,
+    attributes: &Attributes,
+) -> TokenStream2 {
     let mut enum_fields: Vec<TokenStream2> = vec![];
     let mut constructors: Vec<TokenStream2> = vec![];
     let mut decoders: Vec<TokenStream2> = vec![];
@@ -160,8 +174,10 @@ Json.Decode.field \"{enum_variant}\"
                 )});
             }
             EnumVariant::Struct(fs) => {
-                let (ids, tys): (Vec<_>, Vec<_>) =
-                    fs.into_iter().map(|(i, t)| (i.to_string(), t)).unzip();
+                let (ids, tys): (Vec<_>, Vec<_>) = fs
+                    .into_iter()
+                    .map(|(i, t)| (super::convert_case(i, attributes), t))
+                    .unzip();
                 enum_fields.push(quote! {format!("{} {{ {} }}", #id_s, (&[#(format!("{} : {}", #ids, <#tys>::elm_type())),*] as &[String]).join(", "))});
                 constructors.push(quote! {format!("\
         construct{enum_variant} {fields} =
