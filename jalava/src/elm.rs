@@ -59,7 +59,7 @@ where
 
 impl<T: Elm + ToOwned + ?Sized> Elm for std::borrow::Cow<'_, T> {
     fn elm_type() -> String {
-        format!("{}", T::elm_type())
+        T::elm_type()
     }
 
     fn elm_definition() -> Option<String> {

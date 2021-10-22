@@ -82,7 +82,7 @@ enum TypeKind {
     Unit,
     // struct S(String);
     // "string"
-    Newtype(Type),
+    Newtype(Box<Type>),
     // struct S(String, u32);
     // []
     // ["string", 0]
@@ -105,7 +105,7 @@ enum EnumVariant {
     Unit,
     // Variant(String),
     // {"Variant": "string"}
-    Newtype(Type),
+    Newtype(Box<Type>),
     // Variant(String, u32),
     // {"Variant": []}
     // {"Variant": ["string", 0]}
@@ -128,7 +128,7 @@ fn derive_input_to_intermediate(input: DeriveInput) -> Intermediate {
             if meta_list.path.is_ident("jalava") {
                 //
             } else if meta_list.path.is_ident("serde") {
-                attributes = attributes.merge(parse_serde_attributes(meta_list))
+                attributes = attributes.merge(parse_serde_attributes(meta_list));
             } else if meta_list.path.is_ident("rocket") {
                 //
             }
@@ -148,7 +148,7 @@ fn parse_type_kind(data: Data) -> TypeKind {
             Fields::Unit => TypeKind::Unit,
             Fields::Unnamed(mut unnamed) => {
                 if unnamed.unnamed.len() == 1 {
-                    TypeKind::Newtype(unnamed.unnamed.pop().unwrap().into_value().ty)
+                    TypeKind::Newtype(Box::new(unnamed.unnamed.pop().unwrap().into_value().ty))
                 } else {
                     TypeKind::Tuple(unnamed.unnamed.into_iter().map(|u| u.ty).collect())
                 }
@@ -175,9 +175,9 @@ fn parse_type_kind(data: Data) -> TypeKind {
                                 Fields::Unit => EnumVariant::Unit,
                                 Fields::Unnamed(mut unnamed) => {
                                     if unnamed.unnamed.len() == 1 {
-                                        EnumVariant::Newtype(
+                                        EnumVariant::Newtype(Box::new(
                                             unnamed.unnamed.pop().unwrap().into_value().ty,
-                                        )
+                                        ))
                                     } else {
                                         EnumVariant::Tuple(
                                             unnamed.unnamed.into_iter().map(|u| u.ty).collect(),
@@ -216,11 +216,11 @@ fn parse_serde_attributes(meta_list: MetaList) -> Attributes {
                         "camelCase" => attributes.serde_rename_all = Some(Rename::CamelCase),
                         "snake_case" => attributes.serde_rename_all = Some(Rename::SnakeCase),
                         "SCREAMING_SNAKE_CASE" => {
-                            attributes.serde_rename_all = Some(Rename::ScreamingSnakeCase)
+                            attributes.serde_rename_all = Some(Rename::ScreamingSnakeCase);
                         }
                         "kebab-case" => attributes.serde_rename_all = Some(Rename::KebabCase),
                         "SCREAMING-KEBAB-CASE" => {
-                            attributes.serde_rename_all = Some(Rename::ScreamingKebabCase)
+                            attributes.serde_rename_all = Some(Rename::ScreamingKebabCase);
                         }
                         _ => {}
                     }
@@ -233,12 +233,12 @@ fn parse_serde_attributes(meta_list: MetaList) -> Attributes {
                             if let Lit::Str(content) = inner_name_value.lit {
                                 attributes.serde_enum_representation = Some(
                                     EnumRepresentation::TagContent(tag.value(), content.value()),
-                                )
+                                );
                             }
                         }
                     } else {
                         attributes.serde_enum_representation =
-                            Some(EnumRepresentation::Tag(tag.value()))
+                            Some(EnumRepresentation::Tag(tag.value()));
                     }
                 }
             }
@@ -253,7 +253,7 @@ fn parse_serde_attributes(meta_list: MetaList) -> Attributes {
     attributes
 }
 
-fn convert_case(i: Ident, attributes: &Attributes) -> String {
+fn convert_case(i: &Ident, attributes: &Attributes) -> String {
     let i = i.to_string();
     match attributes.serde_rename_all {
         Some(Rename::Lowercase) => i.to_lowercase(),

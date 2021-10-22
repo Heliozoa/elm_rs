@@ -398,5 +398,7 @@ fn elm_test() {
         .current_dir("./tests/elm")
         .output()
         .unwrap();
+    println!("{}", String::from_utf8_lossy(&out.stdout));
+    println!("{}", String::from_utf8_lossy(&out.stderr));
     assert!(out.status.success());
 }
