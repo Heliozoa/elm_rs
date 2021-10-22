@@ -28,20 +28,26 @@ fn intermediate_to_token_stream(
     let (decoder_definition, encoder_definition) = match kind {
         TypeKind::Unit => unit(&elm_type, &decoder_type, &encoder_type),
         TypeKind::Newtype(ty) => newtype(&elm_type, &decoder_type, &encoder_type, &ty),
-        TypeKind::Tuple(ts) => tuple(&elm_type, &decoder_type, &encoder_type, &ts),
-        TypeKind::Struct(mut fs) => {
-            if attributes.serde_transparent && fs.len() == 1 {
+        TypeKind::Tuple(tys) => tuple(&elm_type, &decoder_type, &encoder_type, &tys),
+        TypeKind::Struct(mut fields) => {
+            if attributes.serde_transparent && fields.len() == 1 {
                 newtype(
                     &elm_type,
                     &decoder_type,
                     &encoder_type,
-                    &fs.pop().unwrap().1,
+                    &fields.pop().unwrap().1,
                 )
             } else {
-                struct_type(&elm_type, &decoder_type, &encoder_type, fs, &attributes)
+                struct_type(&elm_type, &decoder_type, &encoder_type, fields, &attributes)
             }
         }
-        TypeKind::Enum(vs) => enum_type(&elm_type, &decoder_type, &encoder_type, vs, &attributes),
+        TypeKind::Enum(variants) => enum_type(
+            &elm_type,
+            &decoder_type,
+            &encoder_type,
+            variants,
+            &attributes,
+        ),
     };
 
     // prepare a list of generics without any bounds
@@ -72,7 +78,7 @@ fn intermediate_to_token_stream(
 }
 
 fn unit(elm_type: &str, decoder_type: &str, encoder_type: &str) -> (TokenStream2, TokenStream2) {
-    let dd = quote! {format!("\
+    let decoder = quote! {format!("\
 {decoder_type} : Json.Decode.Decoder {elm_type}
 {decoder_type} =
     Json.Decode.null {elm_type}
@@ -80,7 +86,7 @@ fn unit(elm_type: &str, decoder_type: &str, encoder_type: &str) -> (TokenStream2
         elm_type = #elm_type,
         decoder_type = #decoder_type,
     )};
-    let ed = quote! {format!("\
+    let encoder = quote! {format!("\
 {encoder_type} : {elm_type} -> Json.Encode.Value
 {encoder_type} _ =
     Json.Encode.null
@@ -88,7 +94,7 @@ fn unit(elm_type: &str, decoder_type: &str, encoder_type: &str) -> (TokenStream2
         elm_type = #elm_type,
         encoder_type = #encoder_type,
     )};
-    (dd, ed)
+    (decoder, encoder)
 }
 
 fn newtype(
@@ -97,7 +103,7 @@ fn newtype(
     encoder_type: &str,
     ty: &Type,
 ) -> (TokenStream2, TokenStream2) {
-    let dd = quote! {format!("\
+    let decoder = quote! {format!("\
 {decoder_type} : Json.Decode.Decoder {elm_type}
 {decoder_type} =
     Json.Decode.map {elm_type} ({inner_decoder})
@@ -106,7 +112,7 @@ fn newtype(
         decoder_type = #decoder_type,
         inner_decoder = <#ty>::decoder_type(),
     )};
-    let ed = quote! {format!("\
+    let encoder = quote! {format!("\
 {encoder_type} : {elm_type} -> Json.Encode.Value
 {encoder_type} ({elm_type} inner) =
     ({inner_encoder}) inner
@@ -115,17 +121,17 @@ fn newtype(
         encoder_type = #encoder_type,
         inner_encoder = <#ty>::encoder_type(),
     )};
-    (dd, ed)
+    (decoder, encoder)
 }
 
 fn tuple(
     elm_type: &str,
     decoder_type: &str,
     encoder_type: &str,
-    ts: &[Type],
+    tys: &[Type],
 ) -> (TokenStream2, TokenStream2) {
-    let idx: Vec<usize> = ts.iter().enumerate().map(|(i, _)| i).collect();
-    let dd = quote! {format!("\
+    let idxs: Vec<usize> = tys.iter().enumerate().map(|(i, _)| i).collect();
+    let decoder = quote! {format!("\
 {decoder_type} : Json.Decode.Decoder {elm_type}
 {decoder_type} =
     Json.Decode.succeed {elm_type}
@@ -133,9 +139,9 @@ fn tuple(
 ",
         elm_type = #elm_type,
         decoder_type = #decoder_type,
-        decoders = (&[#(format!("|> Json.Decode.andThen (\\x -> Json.Decode.index {} ({}) |> Json.Decode.map x)", #idx, <#ts>::decoder_type())),*] as &[String]).join("\n        ")
+        decoders = (&[#(format!("|> Json.Decode.andThen (\\x -> Json.Decode.index {} ({}) |> Json.Decode.map x)", #idxs, <#tys>::decoder_type())),*] as &[String]).join("\n        ")
     )};
-    let ed = quote! {format!("\
+    let encoder = quote! {format!("\
 {encoder_type} : {elm_type} -> Json.Encode.Value
 {encoder_type} ({elm_type} {params}) =
     Json.Encode.list identity
@@ -144,24 +150,24 @@ fn tuple(
 ",
         elm_type = #elm_type,
         encoder_type = #encoder_type,
-        params = (&[#(format!("t{}", #idx)),*] as &[String]).join(" "),
-        encoders = (&[#(format!("({}) t{}", <#ts>::encoder_type(), #idx)),*] as &[String]).join("\n        , "),
+        params = (&[#(format!("t{}", #idxs)),*] as &[String]).join(" "),
+        encoders = (&[#(format!("({}) t{}", <#tys>::encoder_type(), #idxs)),*] as &[String]).join("\n        , "),
     )};
-    (dd, ed)
+    (decoder, encoder)
 }
 
 fn struct_type(
     elm_type: &str,
     decoder_type: &str,
     encoder_type: &str,
-    fs: Vec<(Ident, Type)>,
+    fields: Vec<(Ident, Type)>,
     attributes: &Attributes,
 ) -> (TokenStream2, TokenStream2) {
-    let (ids, ts): (Vec<_>, Vec<_>) = fs
+    let (ids, tys): (Vec<_>, Vec<_>) = fields
         .into_iter()
-        .map(|(i, t)| (super::convert_case(&i, attributes), t))
+        .map(|(id, ty)| (super::convert_case(&id, attributes), ty))
         .unzip();
-    let dd = quote! {format!("\
+    let decoder = quote! {format!("\
 {decoder_type} : Json.Decode.Decoder {elm_type}
 {decoder_type} =
     Json.Decode.succeed {elm_type}
@@ -169,9 +175,9 @@ fn struct_type(
 ",
         elm_type = #elm_type,
         decoder_type = #decoder_type,
-        fields = (&[#(format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{}\" ({})))", #ids, <#ts>::decoder_type())),*] as &[String]).join("\n        "),
+        fields = (&[#(format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{}\" ({})))", #ids, <#tys>::decoder_type())),*] as &[String]).join("\n        "),
     )};
-    let ed = quote! {format!("\
+    let endocer = quote! {format!("\
 {encoder_type} : {elm_type} -> Json.Encode.Value
 {encoder_type} struct =
     Json.Encode.object
@@ -180,46 +186,46 @@ fn struct_type(
 ",
         elm_type = #elm_type,
         encoder_type = #encoder_type,
-        fields = (&[#(format!("( \"{0}\", ({1}) struct.{0} )", #ids, <#ts>::encoder_type())),*] as &[String]).join("\n        , "),
+        fields = (&[#(format!("( \"{0}\", ({1}) struct.{0} )", #ids, <#tys>::encoder_type())),*] as &[String]).join("\n        , "),
     )};
-    (dd, ed)
+    (decoder, endocer)
 }
 
 fn enum_type(
     elm_type: &str,
     decoder_type: &str,
     encoder_type: &str,
-    vs: Vec<(Ident, EnumVariant)>,
+    variants: Vec<(Ident, EnumVariant)>,
     attributes: &Attributes,
 ) -> (TokenStream2, TokenStream2) {
     let mut enum_fields: Vec<TokenStream2> = vec![];
     let mut constructors: Vec<TokenStream2> = vec![];
     let mut decoders: Vec<TokenStream2> = vec![];
     let mut encoders: Vec<TokenStream2> = vec![];
-    for (id, ev) in vs {
-        let id_s = id.to_string().to_camel_case();
-        match ev {
-            EnumVariant::Unit => enum_unit(&mut enum_fields, &mut decoders, &mut encoders, &id_s),
+    for (id, variant) in variants {
+        let id = id.to_string().to_camel_case();
+        match variant {
+            EnumVariant::Unit => enum_unit(&mut enum_fields, &mut decoders, &mut encoders, &id),
             EnumVariant::Newtype(ty) => {
-                enum_newtype(&mut enum_fields, &mut decoders, &mut encoders, &id_s, &ty);
+                enum_newtype(&mut enum_fields, &mut decoders, &mut encoders, &id, &ty);
             }
             EnumVariant::Tuple(tuple_types) => {
                 enum_tuple(
                     &mut enum_fields,
                     &mut decoders,
                     &mut encoders,
-                    &id_s,
+                    &id,
                     &tuple_types,
                 );
             }
-            EnumVariant::Struct(fs) => enum_struct(
+            EnumVariant::Struct(fields) => enum_struct(
                 &mut enum_fields,
                 &mut decoders,
                 &mut encoders,
                 &mut constructors,
-                &id_s,
+                &id,
                 attributes,
-                &fs,
+                &fields,
             ),
         }
     }
@@ -350,11 +356,11 @@ fn enum_struct(
     constructors: &mut Vec<TokenStream2>,
     id: &str,
     attributes: &Attributes,
-    fs: &[(Ident, Type)],
+    fields: &[(Ident, Type)],
 ) {
-    let (ids, tys): (Vec<_>, Vec<_>) = fs
+    let (ids, tys): (Vec<_>, Vec<_>) = fields
         .iter()
-        .map(|(i, t)| (super::convert_case(i, attributes), t))
+        .map(|(id, ty)| (super::convert_case(id, attributes), ty))
         .unzip();
     enum_fields.push(quote! {format!("{} {{ {} }}", #id, (&[#(format!("{} : {}", #ids, <#tys>::elm_type())),*] as &[String]).join(", "))});
     constructors.push(quote! {format!("\

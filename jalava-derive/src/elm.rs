@@ -25,12 +25,12 @@ fn intermediate_to_token_stream(
     let type_definition = match kind {
         TypeKind::Unit => unit(&elm_type),
         TypeKind::Newtype(ty) => newtype(&elm_type, &ty),
-        TypeKind::Tuple(ts) => tuple(&elm_type, &ts),
-        TypeKind::Struct(mut fs) => {
-            if attributes.serde_transparent && fs.len() == 1 {
-                newtype(&elm_type, &fs.pop().unwrap().1)
+        TypeKind::Tuple(tys) => tuple(&elm_type, &tys),
+        TypeKind::Struct(mut fields) => {
+            if attributes.serde_transparent && fields.len() == 1 {
+                newtype(&elm_type, &fields.pop().unwrap().1)
             } else {
-                struct_type(&elm_type, fs, &attributes)
+                struct_type(&elm_type, fields, &attributes)
             }
         }
         TypeKind::Enum(vs) => enum_type(&elm_type, vs, &attributes),
@@ -38,8 +38,8 @@ fn intermediate_to_token_stream(
 
     // prepare a list of generics without any bounds
     let mut without_bounds = generics.clone();
-    for p in without_bounds.type_params_mut() {
-        p.bounds = Punctuated::default();
+    for param in without_bounds.type_params_mut() {
+        param.bounds = Punctuated::default();
     }
 
     quote! {
@@ -84,10 +84,14 @@ type {elm_type}
     )}
 }
 
-fn struct_type(elm_type: &str, fs: Vec<(Ident, Type)>, attributes: &Attributes) -> TokenStream2 {
-    let (ids, ts): (Vec<_>, Vec<_>) = fs
+fn struct_type(
+    elm_type: &str,
+    fields: Vec<(Ident, Type)>,
+    attributes: &Attributes,
+) -> TokenStream2 {
+    let (ids, tys): (Vec<_>, Vec<_>) = fields
         .into_iter()
-        .map(|(i, t)| (super::convert_case(&i, attributes), t))
+        .map(|(id, ty)| (super::convert_case(&id, attributes), ty))
         .unzip();
     quote! {format!("\
 type alias {elm_type} =
@@ -95,32 +99,32 @@ type alias {elm_type} =
     }}
 ", 
         elm_type = #elm_type,
-        fields = (&[#(format!("{} : {}", #ids, <#ts>::elm_type())),*] as &[String]).join("\n    , "),
+        fields = (&[#(format!("{} : {}", #ids, <#tys>::elm_type())),*] as &[String]).join("\n    , "),
     )}
 }
 
 fn enum_type(
     elm_type: &str,
-    vs: Vec<(Ident, EnumVariant)>,
+    variants: Vec<(Ident, EnumVariant)>,
     attributes: &Attributes,
 ) -> TokenStream2 {
     let mut enum_fields: Vec<TokenStream2> = vec![];
-    for (id, ev) in vs {
+    for (id, variant) in variants {
         let id = id.to_string().to_camel_case();
-        match ev {
+        match variant {
             EnumVariant::Unit => {
                 enum_fields.push(quote! {#id});
             }
             EnumVariant::Newtype(ty) => {
                 enum_fields.push(quote! {format!("{} ({})", #id, <#ty>::elm_type())});
             }
-            EnumVariant::Tuple(tuple_types) => enum_fields.push(
-                    quote! {format!("{} {}", #id, (&[#(format!("({})", <#tuple_types>::elm_type())),*] as &[String]).join(" "))},
+            EnumVariant::Tuple(tys) => enum_fields.push(
+                    quote! {format!("{} {}", #id, (&[#(format!("({})", <#tys>::elm_type())),*] as &[String]).join(" "))},
                 ),
-            EnumVariant::Struct(fs) => {
-                let (ids, tys): (Vec<_>, Vec<_>) = fs
+            EnumVariant::Struct(fields) => {
+                let (ids, tys): (Vec<_>, Vec<_>) = fields
                     .into_iter()
-                    .map(|(i, t)| (super::convert_case(&i, attributes), t))
+                    .map(|(id, ty)| (super::convert_case(&id, attributes), ty))
                     .unzip();
                 enum_fields.push(quote! {format!("{} {{ {} }}", #id, (&[#(format!("{} : {}", #ids, <#tys>::elm_type())),*] as &[String]).join(", "))});
             }

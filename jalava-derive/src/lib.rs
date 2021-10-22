@@ -150,14 +150,14 @@ fn parse_type_kind(data: Data) -> TypeKind {
                 if unnamed.unnamed.len() == 1 {
                     TypeKind::Newtype(Box::new(unnamed.unnamed.pop().unwrap().into_value().ty))
                 } else {
-                    TypeKind::Tuple(unnamed.unnamed.into_iter().map(|u| u.ty).collect())
+                    TypeKind::Tuple(unnamed.unnamed.into_iter().map(|field| field.ty).collect())
                 }
             }
             Fields::Named(named) => TypeKind::Struct(
                 named
                     .named
                     .into_iter()
-                    .map(|f| (f.ident.unwrap(), f.ty))
+                    .map(|field| (field.ident.unwrap(), field.ty))
                     .collect(),
             ),
         },
@@ -168,10 +168,10 @@ fn parse_type_kind(data: Data) -> TypeKind {
             TypeKind::Enum(
                 variants
                     .into_iter()
-                    .map(|v| {
+                    .map(|variant| {
                         (
-                            v.ident,
-                            match v.fields {
+                            variant.ident,
+                            match variant.fields {
                                 Fields::Unit => EnumVariant::Unit,
                                 Fields::Unnamed(mut unnamed) => {
                                     if unnamed.unnamed.len() == 1 {
@@ -180,7 +180,11 @@ fn parse_type_kind(data: Data) -> TypeKind {
                                         ))
                                     } else {
                                         EnumVariant::Tuple(
-                                            unnamed.unnamed.into_iter().map(|u| u.ty).collect(),
+                                            unnamed
+                                                .unnamed
+                                                .into_iter()
+                                                .map(|field| field.ty)
+                                                .collect(),
                                         )
                                     }
                                 }
@@ -188,7 +192,7 @@ fn parse_type_kind(data: Data) -> TypeKind {
                                     named
                                         .named
                                         .into_iter()
-                                        .map(|f| (f.ident.unwrap(), f.ty))
+                                        .map(|field| (field.ident.unwrap(), field.ty))
                                         .collect(),
                                 ),
                             },
@@ -208,8 +212,8 @@ fn parse_serde_attributes(meta_list: MetaList) -> Attributes {
     match nested.next() {
         Some(NestedMeta::Meta(Meta::NameValue(name_value))) => {
             if name_value.path.is_ident("rename_all") {
-                if let Lit::Str(s) = name_value.lit {
-                    match s.value().as_str() {
+                if let Lit::Str(rename_all) = name_value.lit {
+                    match rename_all.value().as_str() {
                         "lowercase" => attributes.serde_rename_all = Some(Rename::Lowercase),
                         "UPPERCASE" => attributes.serde_rename_all = Some(Rename::Uppercase),
                         "PascalCase" => attributes.serde_rename_all = Some(Rename::PascalCase),
@@ -253,17 +257,17 @@ fn parse_serde_attributes(meta_list: MetaList) -> Attributes {
     attributes
 }
 
-fn convert_case(i: &Ident, attributes: &Attributes) -> String {
-    let i = i.to_string();
+fn convert_case(id: &Ident, attributes: &Attributes) -> String {
+    let id = id.to_string();
     match attributes.serde_rename_all {
-        Some(Rename::Lowercase) => i.to_lowercase(),
-        Some(Rename::Uppercase) => i.to_uppercase(),
-        Some(Rename::PascalCase) => i.to_mixed_case(),
-        Some(Rename::CamelCase) => i.to_camel_case(),
-        Some(Rename::SnakeCase) => i.to_snake_case(),
-        Some(Rename::ScreamingSnakeCase) => i.to_shouty_snake_case(),
-        Some(Rename::KebabCase) => i.to_kebab_case(),
-        Some(Rename::ScreamingKebabCase) => i.to_shouty_kebab_case(),
-        None => i,
+        Some(Rename::Lowercase) => id.to_lowercase(),
+        Some(Rename::Uppercase) => id.to_uppercase(),
+        Some(Rename::PascalCase) => id.to_mixed_case(),
+        Some(Rename::CamelCase) => id.to_camel_case(),
+        Some(Rename::SnakeCase) => id.to_snake_case(),
+        Some(Rename::ScreamingSnakeCase) => id.to_shouty_snake_case(),
+        Some(Rename::KebabCase) => id.to_kebab_case(),
+        Some(Rename::ScreamingKebabCase) => id.to_shouty_kebab_case(),
+        None => id,
     }
 }

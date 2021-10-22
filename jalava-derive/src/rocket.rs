@@ -21,7 +21,7 @@ pub fn derive_elm_form_parts(input: TokenStream) -> TokenStream {
 
 fn intermediate_to_form(
     Intermediate {
-        attributes: _,
+        attributes: _, // todo
         ident,
         generics,
         kind,
@@ -67,8 +67,8 @@ fn intermediate_to_fields(
 }
 
 fn make_prepare_form(form_type_name: &str, fields: &[(Ident, Type)]) -> TokenStream2 {
-    let field_names = fields.iter().map(|v| &v.0);
-    let field_types = fields.iter().map(|v| &v.1);
+    let field_names = fields.iter().map(|(id, _)| id);
+    let field_types = fields.iter().map(|(_, ty)| ty);
 
     quote! {
         use jalava::ElmFormParts;
@@ -88,17 +88,17 @@ prepare{0} form =
     }
 }
 
-fn make_form_parts(ident: &Ident, kind: &TypeKind) -> TokenStream2 {
+fn make_form_parts(id: &Ident, kind: &TypeKind) -> TokenStream2 {
     match kind {
         TypeKind::Struct(fields) => {
-            let fs = fields.iter().map(|f| &f.0);
-            let tys = fields.iter().map(|f| &f.1);
+            let ids = fields.iter().map(|(id, _)| id);
+            let tys = fields.iter().map(|(_, ty)| ty);
             quote! {
                 fn form_parts_inner(field: &str, path: &str, recursion: u32) -> String {
                     format!("{}",
                         [#(format!("{}", <#tys>::form_parts_inner(
-                            &format!("{}.{}", field, stringify!(#fs)),
-                            &format!("{}.{}", path, stringify!(#fs)),
+                            &format!("{}.{}", field, stringify!(#ids)),
+                            &format!("{}.{}", path, stringify!(#ids)),
                             recursion + 1
                         ))),*
                         ].join("\n            , "))
@@ -108,14 +108,14 @@ fn make_form_parts(ident: &Ident, kind: &TypeKind) -> TokenStream2 {
         TypeKind::Enum(fields) => {
             let names = fields
                 .iter()
-                .map(|f| match f.1 {
-                    EnumVariant::Unit => &f.0,
+                .map(|(id, variant)| match variant {
+                    EnumVariant::Unit => id,
                     _ => panic!("only unit variants are supported"),
                 })
                 .collect::<Vec<_>>();
 
-            let s_ident = ident.to_string();
-            let to_string = format!("{}ToString", s_ident.to_mixed_case());
+            let id = id.to_string();
+            let to_string = format!("{}ToString", id.to_mixed_case());
             let to_string_definition = quote! {format!(
                 "\
 {0} : {1} -> String
@@ -124,7 +124,7 @@ fn make_form_parts(ident: &Ident, kind: &TypeKind) -> TokenStream2 {
         {2}
 ",
                 #to_string,
-                #s_ident,
+                #id,
                 [#(format!("{0} -> \"{0}\"", stringify!(#names))),*].join("\n\n        ")
             )};
             quote! {
