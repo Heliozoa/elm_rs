@@ -21,7 +21,7 @@ pub fn derive_elm_form_parts(input: TokenStream) -> TokenStream {
 
 fn intermediate_to_form(
     Intermediate {
-        attributes,
+        attributes: _,
         ident,
         generics,
         kind,
@@ -51,7 +51,7 @@ fn intermediate_to_form(
 
 fn intermediate_to_fields(
     Intermediate {
-        attributes,
+        attributes: _,
         ident,
         generics,
         kind,
