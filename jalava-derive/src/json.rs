@@ -1,9 +1,11 @@
-use super::{Attributes, EnumVariant, Intermediate, TypeKind};
+use crate::{EnumVariant, StructField};
+
+use super::{EnumKind, Intermediate, TypeInfo};
 use heck::{CamelCase, MixedCase};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, punctuated::Punctuated, DeriveInput, Ident, Type};
+use syn::{parse_macro_input, punctuated::Punctuated, DeriveInput, Type};
 
 pub fn derive_elm_json(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
@@ -14,10 +16,9 @@ pub fn derive_elm_json(input: TokenStream) -> TokenStream {
 
 fn intermediate_to_token_stream(
     Intermediate {
-        attributes,
         ident,
         generics,
-        kind,
+        type_info: kind,
     }: Intermediate,
 ) -> TokenStream2 {
     let elm_type = ident.to_string().to_camel_case();
@@ -26,28 +27,11 @@ fn intermediate_to_token_stream(
     let encoder_type = format!("{}Encoder", elm_type.to_mixed_case());
 
     let (decoder_definition, encoder_definition) = match kind {
-        TypeKind::Unit => unit(&elm_type, &decoder_type, &encoder_type),
-        TypeKind::Newtype(ty) => newtype(&elm_type, &decoder_type, &encoder_type, &ty),
-        TypeKind::Tuple(tys) => tuple(&elm_type, &decoder_type, &encoder_type, &tys),
-        TypeKind::Struct(mut fields) => {
-            if attributes.serde_transparent && fields.len() == 1 {
-                newtype(
-                    &elm_type,
-                    &decoder_type,
-                    &encoder_type,
-                    &fields.pop().unwrap().1,
-                )
-            } else {
-                struct_type(&elm_type, &decoder_type, &encoder_type, fields, &attributes)
-            }
-        }
-        TypeKind::Enum(variants) => enum_type(
-            &elm_type,
-            &decoder_type,
-            &encoder_type,
-            variants,
-            &attributes,
-        ),
+        TypeInfo::Unit => unit(&elm_type, &decoder_type, &encoder_type),
+        TypeInfo::Newtype(ty) => newtype(&elm_type, &decoder_type, &encoder_type, &ty),
+        TypeInfo::Tuple(tys) => tuple(&elm_type, &decoder_type, &encoder_type, &tys),
+        TypeInfo::Struct(fields) => struct_type(&elm_type, &decoder_type, &encoder_type, fields),
+        TypeInfo::Enum(variants) => enum_type(&elm_type, &decoder_type, &encoder_type, variants),
     };
 
     // prepare a list of generics without any bounds
@@ -160,13 +144,10 @@ fn struct_type(
     elm_type: &str,
     decoder_type: &str,
     encoder_type: &str,
-    fields: Vec<(Ident, Type)>,
-    attributes: &Attributes,
+    fields: Vec<StructField>,
 ) -> (TokenStream2, TokenStream2) {
-    let (ids, tys): (Vec<_>, Vec<_>) = fields
-        .into_iter()
-        .map(|(id, ty)| (super::convert_case(&id, attributes), ty))
-        .unzip();
+    let ids = fields.iter().map(|field| field.name());
+    let tys = fields.iter().map(|field| &field.ty);
     let decoder = quote! {format!("\
 {decoder_type} : Json.Decode.Decoder {elm_type}
 {decoder_type} =
@@ -177,7 +158,10 @@ fn struct_type(
         decoder_type = #decoder_type,
         fields = (&[#(format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{}\" ({})))", #ids, <#tys>::decoder_type())),*] as &[String]).join("\n        "),
     )};
-    let endocer = quote! {format!("\
+
+    let ids = fields.iter().map(|field| field.name());
+    let tys = fields.iter().map(|field| &field.ty);
+    let encoder = quote! {format!("\
 {encoder_type} : {elm_type} -> Json.Encode.Value
 {encoder_type} struct =
     Json.Encode.object
@@ -188,28 +172,27 @@ fn struct_type(
         encoder_type = #encoder_type,
         fields = (&[#(format!("( \"{0}\", ({1}) struct.{0} )", #ids, <#tys>::encoder_type())),*] as &[String]).join("\n        , "),
     )};
-    (decoder, endocer)
+    (decoder, encoder)
 }
 
 fn enum_type(
     elm_type: &str,
     decoder_type: &str,
     encoder_type: &str,
-    variants: Vec<(Ident, EnumVariant)>,
-    attributes: &Attributes,
+    variants: Vec<EnumVariant>,
 ) -> (TokenStream2, TokenStream2) {
     let mut enum_fields: Vec<TokenStream2> = vec![];
     let mut constructors: Vec<TokenStream2> = vec![];
     let mut decoders: Vec<TokenStream2> = vec![];
     let mut encoders: Vec<TokenStream2> = vec![];
-    for (id, variant) in variants {
-        let id = id.to_string().to_camel_case();
-        match variant {
-            EnumVariant::Unit => enum_unit(&mut enum_fields, &mut decoders, &mut encoders, &id),
-            EnumVariant::Newtype(ty) => {
+    for variant in variants {
+        let id = variant.ident.to_string().to_camel_case();
+        match variant.variant {
+            EnumKind::Unit => enum_unit(&mut enum_fields, &mut decoders, &mut encoders, &id),
+            EnumKind::Newtype(ty) => {
                 enum_newtype(&mut enum_fields, &mut decoders, &mut encoders, &id, &ty);
             }
-            EnumVariant::Tuple(tuple_types) => {
+            EnumKind::Tuple(tuple_types) => {
                 enum_tuple(
                     &mut enum_fields,
                     &mut decoders,
@@ -218,13 +201,12 @@ fn enum_type(
                     &tuple_types,
                 );
             }
-            EnumVariant::Struct(fields) => enum_struct(
+            EnumKind::Struct(fields) => enum_struct(
                 &mut enum_fields,
                 &mut decoders,
                 &mut encoders,
                 &mut constructors,
                 &id,
-                attributes,
                 &fields,
             ),
         }
@@ -355,13 +337,9 @@ fn enum_struct(
     encoders: &mut Vec<TokenStream2>,
     constructors: &mut Vec<TokenStream2>,
     id: &str,
-    attributes: &Attributes,
-    fields: &[(Ident, Type)],
+    fields: &[StructField],
 ) {
-    let (ids, tys): (Vec<_>, Vec<_>) = fields
-        .iter()
-        .map(|(id, ty)| (super::convert_case(id, attributes), ty))
-        .unzip();
+    let (ids, tys): (Vec<_>, Vec<_>) = fields.iter().map(|field| (field.name(), &field.ty)).unzip();
     enum_fields.push(quote! {format!("{} {{ {} }}", #id, (&[#(format!("{} : {}", #ids, <#tys>::elm_type())),*] as &[String]).join(", "))});
     constructors.push(quote! {format!("\
         construct{enum_variant} {fields} =

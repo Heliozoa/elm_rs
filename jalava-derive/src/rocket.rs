@@ -1,9 +1,9 @@
-use crate::{EnumVariant, Intermediate, TypeKind};
+use crate::{EnumKind, Intermediate, StructField, TypeInfo};
 use heck::{CamelCase, MixedCase};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Ident, Type};
+use syn::{parse_macro_input, DeriveInput, Ident};
 
 pub fn derive_elm_form(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
@@ -21,15 +21,14 @@ pub fn derive_elm_form_parts(input: TokenStream) -> TokenStream {
 
 fn intermediate_to_form(
     Intermediate {
-        attributes: _, // todo
         ident,
         generics,
-        kind,
+        type_info: kind,
     }: Intermediate,
 ) -> TokenStream2 {
     let elm_type = ident.to_string().to_camel_case();
     let form_parts = make_form_parts(&ident, &kind);
-    let fields = if let TypeKind::Struct(fields) = kind {
+    let fields = if let TypeInfo::Struct(fields) = kind {
         fields
     } else {
         panic!("only structs are supported")
@@ -51,10 +50,9 @@ fn intermediate_to_form(
 
 fn intermediate_to_fields(
     Intermediate {
-        attributes: _,
         ident,
         generics,
-        kind,
+        type_info: kind,
     }: Intermediate,
 ) -> TokenStream2 {
     let form_parts = make_form_parts(&ident, &kind);
@@ -66,9 +64,9 @@ fn intermediate_to_fields(
     }
 }
 
-fn make_prepare_form(form_type_name: &str, fields: &[(Ident, Type)]) -> TokenStream2 {
-    let field_names = fields.iter().map(|(id, _)| id);
-    let field_types = fields.iter().map(|(_, ty)| ty);
+fn make_prepare_form(form_type_name: &str, fields: &[StructField]) -> TokenStream2 {
+    let field_names = fields.iter().map(|field| &field.ident);
+    let field_types = fields.iter().map(|field| &field.ty);
 
     quote! {
         use jalava::ElmFormParts;
@@ -88,11 +86,11 @@ prepare{0} form =
     }
 }
 
-fn make_form_parts(id: &Ident, kind: &TypeKind) -> TokenStream2 {
+fn make_form_parts(id: &Ident, kind: &TypeInfo) -> TokenStream2 {
     match kind {
-        TypeKind::Struct(fields) => {
-            let ids = fields.iter().map(|(id, _)| id);
-            let tys = fields.iter().map(|(_, ty)| ty);
+        TypeInfo::Struct(fields) => {
+            let ids = fields.iter().map(|field| &field.ident);
+            let tys = fields.iter().map(|field| &field.ty);
             quote! {
                 fn form_parts_inner(field: &str, path: &str, recursion: u32) -> String {
                     format!("{}",
@@ -105,11 +103,11 @@ fn make_form_parts(id: &Ident, kind: &TypeKind) -> TokenStream2 {
                 }
             }
         }
-        TypeKind::Enum(fields) => {
+        TypeInfo::Enum(fields) => {
             let names = fields
                 .iter()
-                .map(|(id, variant)| match variant {
-                    EnumVariant::Unit => id,
+                .map(|variant| match variant.variant {
+                    EnumKind::Unit => &variant.ident,
                     _ => panic!("only unit variants are supported"),
                 })
                 .collect::<Vec<_>>();

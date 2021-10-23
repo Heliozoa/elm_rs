@@ -2,10 +2,13 @@ mod elm;
 mod json;
 mod rocket;
 
+use std::borrow::Cow;
+
 use heck::{CamelCase, KebabCase, MixedCase, ShoutyKebabCase, ShoutySnakeCase, SnakeCase};
 use proc_macro::TokenStream;
 use syn::{
-    Data, DataEnum, DeriveInput, Fields, Generics, Ident, Lit, Meta, MetaList, NestedMeta, Type,
+    Attribute, Data, DataEnum, DeriveInput, Fields, Generics, Ident, Lit, Meta, MetaList,
+    NestedMeta, Type,
 };
 
 /// Derive `Elm` for any type with fields that all implement `Elm`
@@ -34,32 +37,20 @@ pub fn derive_elm_form_parts(input: TokenStream) -> TokenStream {
 }
 
 struct Intermediate {
-    attributes: Attributes,
     ident: Ident,
     generics: Generics,
-    kind: TypeKind,
+    type_info: TypeInfo,
 }
 
 #[derive(Default)]
-struct Attributes {
-    serde_rename_all: Option<Rename>,
+struct ContainerAttributes {
+    serde_rename_all: Option<RenameAll>,
     serde_enum_representation: Option<EnumRepresentation>,
     serde_transparent: bool,
 }
 
-impl Attributes {
-    fn merge(self, merge: Self) -> Self {
-        Attributes {
-            serde_rename_all: self.serde_rename_all.or(merge.serde_rename_all),
-            serde_enum_representation: self
-                .serde_enum_representation
-                .or(merge.serde_enum_representation),
-            serde_transparent: self.serde_transparent || merge.serde_transparent,
-        }
-    }
-}
-
-enum Rename {
+#[derive(Clone, Copy)]
+enum RenameAll {
     Lowercase,
     Uppercase,
     PascalCase,
@@ -70,13 +61,23 @@ enum Rename {
     ScreamingKebabCase,
 }
 
+enum Rename {
+    Container(RenameAll),
+    Field(String),
+}
+
 enum EnumRepresentation {
     Tag(String),
     TagContent(String, String),
     Untagged,
 }
 
-enum TypeKind {
+#[derive(Default)]
+struct FieldAttributes {
+    serde_rename: Option<String>,
+}
+
+enum TypeInfo {
     // struct S;
     // null
     Unit,
@@ -92,14 +93,48 @@ enum TypeKind {
     // }
     // {}
     // {"s": "string"}
-    Struct(Vec<(Ident, Type)>),
+    Struct(Vec<StructField>),
     // enum E {
     //     Variant,
     // }
-    Enum(Vec<(Ident, EnumVariant)>),
+    Enum(Vec<EnumVariant>),
 }
 
-enum EnumVariant {
+struct StructField {
+    ident: Ident,
+    rename: Option<Rename>,
+    ty: Type,
+}
+
+impl StructField {
+    fn name<'a>(&'a self) -> Cow<'a, str> {
+        match &self.rename {
+            Some(Rename::Container(rename_all)) => match rename_all {
+                RenameAll::Lowercase => self.ident.to_string().to_lowercase().into(),
+                RenameAll::Uppercase => self.ident.to_string().to_uppercase().into(),
+                RenameAll::PascalCase => self.ident.to_string().to_mixed_case().into(),
+                RenameAll::CamelCase => self.ident.to_string().to_camel_case().into(),
+                RenameAll::SnakeCase => self.ident.to_string().to_snake_case().into(),
+                RenameAll::ScreamingSnakeCase => {
+                    self.ident.to_string().to_shouty_snake_case().into()
+                }
+                RenameAll::KebabCase => self.ident.to_string().to_kebab_case().into(),
+                RenameAll::ScreamingKebabCase => {
+                    self.ident.to_string().to_shouty_kebab_case().into()
+                }
+            },
+            Some(Rename::Field(rename)) => rename.into(),
+            None => self.ident.to_string().into(),
+        }
+    }
+}
+
+struct EnumVariant {
+    ident: Ident,
+    variant: EnumKind,
+}
+
+enum EnumKind {
     // Variant,
     // "Variant"
     Unit,
@@ -115,88 +150,108 @@ enum EnumVariant {
     // }
     // {}
     // {"s": "string"}
-    Struct(Vec<(Ident, Type)>),
+    Struct(Vec<StructField>),
 }
 
 // parses the input to an intermediate representation that's convenient to turn into the end result
 fn derive_input_to_intermediate(input: DeriveInput) -> Intermediate {
-    let type_kind = parse_type_kind(input.data);
-
-    let mut attributes = Attributes::default();
-    for attr in input.attrs {
-        if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
-            if meta_list.path.is_ident("jalava") {
-                //
-            } else if meta_list.path.is_ident("serde") {
-                attributes = attributes.merge(parse_serde_attributes(meta_list));
-            } else if meta_list.path.is_ident("rocket") {
-                //
-            }
-        }
-    }
+    let container_attributes = parse_container_attributes(&input.attrs);
+    let type_info = parse_type_info(input.data, &container_attributes);
     Intermediate {
-        attributes,
         ident: input.ident,
         generics: input.generics,
-        kind: type_kind,
+        type_info,
     }
 }
 
-fn parse_type_kind(data: Data) -> TypeKind {
+fn parse_type_info(data: Data, attributes: &ContainerAttributes) -> TypeInfo {
     match data {
         Data::Struct(data_struct) => match data_struct.fields {
-            Fields::Unit => TypeKind::Unit,
+            Fields::Unit => TypeInfo::Unit,
             Fields::Unnamed(mut unnamed) => {
                 if unnamed.unnamed.len() == 1 {
-                    TypeKind::Newtype(Box::new(unnamed.unnamed.pop().unwrap().into_value().ty))
+                    TypeInfo::Newtype(Box::new(unnamed.unnamed.pop().unwrap().into_value().ty))
                 } else {
-                    TypeKind::Tuple(unnamed.unnamed.into_iter().map(|field| field.ty).collect())
+                    TypeInfo::Tuple(unnamed.unnamed.into_iter().map(|field| field.ty).collect())
                 }
             }
-            Fields::Named(named) => TypeKind::Struct(
-                named
-                    .named
-                    .into_iter()
-                    .map(|field| (field.ident.unwrap(), field.ty))
-                    .collect(),
-            ),
+            Fields::Named(mut named) => {
+                if attributes.serde_transparent && named.named.len() == 1 {
+                    TypeInfo::Newtype(Box::new(named.named.pop().unwrap().into_value().ty))
+                } else {
+                    TypeInfo::Struct(
+                        named
+                            .named
+                            .into_iter()
+                            .map(|field| {
+                                let ident = field.ident.unwrap();
+                                let field_attributes = parse_field_attributes(&field.attrs);
+                                StructField {
+                                    ident,
+                                    rename: field_attributes
+                                        .serde_rename
+                                        .map(Rename::Field)
+                                        .or(attributes.serde_rename_all.map(Rename::Container)),
+                                    ty: field.ty,
+                                }
+                            })
+                            .collect(),
+                    )
+                }
+            }
         },
         Data::Enum(DataEnum { variants, .. }) => {
             if variants.is_empty() {
                 panic!("empty enums are not supported");
             }
-            TypeKind::Enum(
+            TypeInfo::Enum(
                 variants
                     .into_iter()
                     .map(|variant| {
-                        (
-                            variant.ident,
-                            match variant.fields {
-                                Fields::Unit => EnumVariant::Unit,
-                                Fields::Unnamed(mut unnamed) => {
-                                    if unnamed.unnamed.len() == 1 {
-                                        EnumVariant::Newtype(Box::new(
+                        parse_variant_attributes(&variant.attrs);
+                        match variant.fields {
+                            Fields::Unit => EnumVariant {
+                                ident: variant.ident,
+                                variant: EnumKind::Unit,
+                            },
+                            Fields::Unnamed(mut unnamed) => {
+                                if unnamed.unnamed.len() == 1 {
+                                    EnumVariant {
+                                        ident: variant.ident,
+                                        variant: EnumKind::Newtype(Box::new(
                                             unnamed.unnamed.pop().unwrap().into_value().ty,
-                                        ))
-                                    } else {
-                                        EnumVariant::Tuple(
+                                        )),
+                                    }
+                                } else {
+                                    EnumVariant {
+                                        ident: variant.ident,
+                                        variant: EnumKind::Tuple(
                                             unnamed
                                                 .unnamed
                                                 .into_iter()
                                                 .map(|field| field.ty)
                                                 .collect(),
-                                        )
+                                        ),
                                     }
                                 }
-                                Fields::Named(named) => EnumVariant::Struct(
+                            }
+                            Fields::Named(named) => EnumVariant {
+                                ident: variant.ident,
+                                variant: EnumKind::Struct(
                                     named
                                         .named
                                         .into_iter()
-                                        .map(|field| (field.ident.unwrap(), field.ty))
+                                        .map(|field| StructField {
+                                            ident: field.ident.unwrap(),
+                                            rename: attributes
+                                                .serde_rename_all
+                                                .map(Rename::Container),
+                                            ty: field.ty,
+                                        })
                                         .collect(),
                                 ),
                             },
-                        )
+                        }
                     })
                     .collect(),
             )
@@ -205,26 +260,40 @@ fn parse_type_kind(data: Data) -> TypeKind {
     }
 }
 
-fn parse_serde_attributes(meta_list: MetaList) -> Attributes {
-    let mut attributes = Attributes::default();
+fn parse_container_attributes(attrs: &[Attribute]) -> ContainerAttributes {
+    let mut attributes = ContainerAttributes::default();
+    for attr in attrs {
+        if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
+            if meta_list.path.is_ident("jalava") {
+                //
+            } else if meta_list.path.is_ident("serde") {
+                parse_serde_container_attributes(&mut attributes, meta_list);
+            } else if meta_list.path.is_ident("rocket") {
+                //
+            }
+        }
+    }
+    attributes
+}
 
+fn parse_serde_container_attributes(attributes: &mut ContainerAttributes, meta_list: MetaList) {
     let mut nested = meta_list.nested.into_iter();
     match nested.next() {
         Some(NestedMeta::Meta(Meta::NameValue(name_value))) => {
             if name_value.path.is_ident("rename_all") {
                 if let Lit::Str(rename_all) = name_value.lit {
                     match rename_all.value().as_str() {
-                        "lowercase" => attributes.serde_rename_all = Some(Rename::Lowercase),
-                        "UPPERCASE" => attributes.serde_rename_all = Some(Rename::Uppercase),
-                        "PascalCase" => attributes.serde_rename_all = Some(Rename::PascalCase),
-                        "camelCase" => attributes.serde_rename_all = Some(Rename::CamelCase),
-                        "snake_case" => attributes.serde_rename_all = Some(Rename::SnakeCase),
+                        "lowercase" => attributes.serde_rename_all = Some(RenameAll::Lowercase),
+                        "UPPERCASE" => attributes.serde_rename_all = Some(RenameAll::Uppercase),
+                        "PascalCase" => attributes.serde_rename_all = Some(RenameAll::PascalCase),
+                        "camelCase" => attributes.serde_rename_all = Some(RenameAll::CamelCase),
+                        "snake_case" => attributes.serde_rename_all = Some(RenameAll::SnakeCase),
                         "SCREAMING_SNAKE_CASE" => {
-                            attributes.serde_rename_all = Some(Rename::ScreamingSnakeCase);
+                            attributes.serde_rename_all = Some(RenameAll::ScreamingSnakeCase);
                         }
-                        "kebab-case" => attributes.serde_rename_all = Some(Rename::KebabCase),
+                        "kebab-case" => attributes.serde_rename_all = Some(RenameAll::KebabCase),
                         "SCREAMING-KEBAB-CASE" => {
-                            attributes.serde_rename_all = Some(Rename::ScreamingKebabCase);
+                            attributes.serde_rename_all = Some(RenameAll::ScreamingKebabCase);
                         }
                         _ => {}
                     }
@@ -245,6 +314,19 @@ fn parse_serde_attributes(meta_list: MetaList) -> Attributes {
                             Some(EnumRepresentation::Tag(tag.value()));
                     }
                 }
+            } else if name_value.path.is_ident("content") {
+                if let Lit::Str(content) = name_value.lit {
+                    if let Some(NestedMeta::Meta(Meta::NameValue(inner_name_value))) = nested.next()
+                    {
+                        if inner_name_value.path.is_ident("tag") {
+                            if let Lit::Str(tag) = inner_name_value.lit {
+                                attributes.serde_enum_representation = Some(
+                                    EnumRepresentation::TagContent(content.value(), tag.value()),
+                                );
+                            }
+                        }
+                    }
+                }
             }
         }
         Some(NestedMeta::Lit(Lit::Str(s))) => match s.value().as_str() {
@@ -254,20 +336,43 @@ fn parse_serde_attributes(meta_list: MetaList) -> Attributes {
         },
         _ => {}
     }
+}
+
+fn parse_variant_attributes(_attrs: &[Attribute]) -> () {
+    // todo
+}
+
+fn parse_field_attributes(attrs: &[Attribute]) -> FieldAttributes {
+    let mut attributes = FieldAttributes::default();
+
+    for attr in attrs {
+        if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
+            if meta_list.path.is_ident("jalava") {
+                //
+            } else if meta_list.path.is_ident("serde") {
+                parse_serde_field_attributes(&mut attributes, meta_list);
+            } else if meta_list.path.is_ident("rocket") {
+                //
+            }
+        }
+    }
+
     attributes
 }
 
-fn convert_case(id: &Ident, attributes: &Attributes) -> String {
-    let id = id.to_string();
-    match attributes.serde_rename_all {
-        Some(Rename::Lowercase) => id.to_lowercase(),
-        Some(Rename::Uppercase) => id.to_uppercase(),
-        Some(Rename::PascalCase) => id.to_mixed_case(),
-        Some(Rename::CamelCase) => id.to_camel_case(),
-        Some(Rename::SnakeCase) => id.to_snake_case(),
-        Some(Rename::ScreamingSnakeCase) => id.to_shouty_snake_case(),
-        Some(Rename::KebabCase) => id.to_kebab_case(),
-        Some(Rename::ScreamingKebabCase) => id.to_shouty_kebab_case(),
-        None => id,
+fn parse_serde_field_attributes(attributes: &mut FieldAttributes, meta_list: MetaList) {
+    let mut nested = meta_list.nested.into_iter();
+    match nested.next() {
+        Some(NestedMeta::Meta(Meta::NameValue(name_value))) => {
+            if name_value.path.is_ident("rename") {
+                if let Lit::Str(rename) = name_value.lit {
+                    attributes.serde_rename = Some(rename.value())
+                }
+            }
+        }
+        Some(NestedMeta::Lit(Lit::Str(s))) => match s.value().as_str() {
+            _ => {}
+        },
+        _ => {}
     }
 }
