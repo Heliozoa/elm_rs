@@ -2,8 +2,8 @@ Automatically generate type definitions and functions for your Elm frontend from
 - Elm types with the `Elm` trait and derive macro
 - JSON encoders and decoders, compatible with `serde` and `serde_json`, with the `ElmJson` trait and derive macro
 - Multipart form requests that can be parsed by Rocket's `FromForm` with the `ElmForm` and `ElmFormParts` traits and derive macros
-Note that many attributes that are used to configure the derive macros of `Serialize`, `Deserialize` or `FromForm` are not taken into account yet.
 
+### Usage
 For example, the following Rust types
 ```rust
 use jalava::{Elm, ElmJson, ElmForm, ElmFormParts};
@@ -113,17 +113,15 @@ prepareDrawing form =
             ]
 ```
 
+### Notes
+Note that many attributes that are used to configure the derive macros of `Serialize`, `Deserialize` or `FromForm` are not taken into account yet.
+
 ### 0.1.0
 - [x] Generate Elm types with the `Elm` trait and derive macro
 - [x] Generate JSON encoders and decoders with the `ElmJson` trait and derive macro
 - [x] Generate Elm functions that create multipart requests compatible with Rocket's multipart form parsing through the `rocket::{ElmForm, ElmFormField}` traits and derive macros
 - [x] Basic generic support
-- [ ] Compatibility with serde container attributes
-  - [x] rename_all
-  - [ ] tag
-  - [ ] tag and content
-  - [ ] untagged
-  - [x] transparent
+- [x] Compatibility with serde container attributes
 - [ ] Compatibility with serde variant attributes
 - [ ] Compatibility with serde field attributes
 - [ ] Compatibility with rocket attributes (e.g. `field`)

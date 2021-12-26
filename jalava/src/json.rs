@@ -207,7 +207,6 @@ resultEncoder enum =
     case enum of
         Ok inner ->
             Json.Encode.object [ ( "Ok", {} inner ) ]
-
         Err inner ->
             Json.Encode.object [ ( "Err", {} inner ) ]"#,
             T::elm_type(),

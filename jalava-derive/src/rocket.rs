@@ -1,5 +1,7 @@
-use crate::{EnumKind, Intermediate, StructField, TypeInfo};
-use heck::{CamelCase, MixedCase};
+//! Derive macros for Rocket forms.
+
+use crate::{EnumVariantKind, Intermediate, StructField, TypeInfo};
+use heck::ToLowerCamelCase;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
@@ -7,14 +9,23 @@ use syn::{parse_macro_input, DeriveInput, Ident};
 
 pub fn derive_elm_form(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
-    let intermediate = super::derive_input_to_intermediate(derive_input);
-    let token_stream = intermediate_to_form(intermediate);
+    let intermediate = match super::derive_input_to_intermediate(derive_input) {
+        Ok(intermediate) => intermediate,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    let token_stream = match intermediate_to_form(intermediate) {
+        Ok(token_stream) => token_stream,
+        Err(err) => return err.to_compile_error().into(),
+    };
     TokenStream::from(token_stream)
 }
 
 pub fn derive_elm_form_parts(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
-    let intermediate = super::derive_input_to_intermediate(derive_input);
+    let intermediate = match super::derive_input_to_intermediate(derive_input) {
+        Ok(intermediate) => intermediate,
+        Err(err) => return err.to_compile_error().into(),
+    };
     let token_stream = intermediate_to_fields(intermediate);
     TokenStream::from(token_stream)
 }
@@ -22,30 +33,32 @@ pub fn derive_elm_form_parts(input: TokenStream) -> TokenStream {
 fn intermediate_to_form(
     Intermediate {
         ident,
+        elm_type,
         generics,
-        type_info: kind,
+        generics_without_bounds,
+        type_info,
     }: Intermediate,
-) -> TokenStream2 {
-    let elm_type = ident.to_string().to_camel_case();
-    let form_parts = make_form_parts(&ident, &kind);
-    let fields = if let TypeInfo::Struct(fields) = kind {
+) -> Result<TokenStream2, syn::Error> {
+    let form_parts = make_form_parts(&ident, &type_info);
+    let fields = if let TypeInfo::Struct(fields) = type_info {
         fields
     } else {
-        panic!("only structs are supported")
+        return Err(syn::Error::new(ident.span(), "only structs are supported"));
     };
     let prepare_form = make_prepare_form(&elm_type, &fields);
 
-    quote! {
-        impl #generics jalava::ElmForm for #ident #generics {
+    let block = quote! {
+        impl #generics jalava::ElmForm for #ident #generics_without_bounds {
             fn prepare_form() -> String {
                 #prepare_form
             }
         }
 
-        impl #generics jalava::ElmFormParts for #ident #generics {
+        impl #generics jalava::ElmFormParts for #ident #generics_without_bounds {
             #form_parts
         }
-    }
+    };
+    Ok(block)
 }
 
 fn intermediate_to_fields(
@@ -53,6 +66,7 @@ fn intermediate_to_fields(
         ident,
         generics,
         type_info: kind,
+        ..
     }: Intermediate,
 ) -> TokenStream2 {
     let form_parts = make_form_parts(&ident, &kind);
@@ -103,17 +117,17 @@ fn make_form_parts(id: &Ident, kind: &TypeInfo) -> TokenStream2 {
                 }
             }
         }
-        TypeInfo::Enum(fields) => {
-            let names = fields
+        TypeInfo::Enum { variants, .. } => {
+            let names = variants
                 .iter()
                 .map(|variant| match variant.variant {
-                    EnumKind::Unit => &variant.ident,
+                    EnumVariantKind::Unit { .. } => &variant.ident,
                     _ => panic!("only unit variants are supported"),
                 })
                 .collect::<Vec<_>>();
 
             let id = id.to_string();
-            let to_string = format!("{}ToString", id.to_mixed_case());
+            let to_string = format!("{}ToString", id.to_lower_camel_case());
             let to_string_definition = quote! {format!(
                 "\
 {0} : {1} -> String

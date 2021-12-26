@@ -1,14 +1,19 @@
+//! Derive macros for jalava.
+
+mod attributes;
 mod elm;
 mod json;
+#[cfg(feature = "rocket")]
 mod rocket;
 
-use std::borrow::Cow;
-
-use heck::{CamelCase, KebabCase, MixedCase, ShoutyKebabCase, ShoutySnakeCase, SnakeCase};
+use self::attributes::*;
+use heck::{ToLowerCamelCase, ToPascalCase};
 use proc_macro::TokenStream;
+use proc_macro2::Span;
+use std::borrow::Cow;
 use syn::{
-    Attribute, Data, DataEnum, DeriveInput, Fields, Generics, Ident, Lit, Meta, MetaList,
-    NestedMeta, Type,
+    punctuated::Punctuated, spanned::Spanned, Data, DataEnum, DeriveInput, Fields, FieldsNamed,
+    Generics, Ident, Path, TraitBound, Type, TypeParamBound, Variant,
 };
 
 /// Derive `Elm` for any type with fields that all implement `Elm`
@@ -25,56 +30,26 @@ pub fn derive_elm_json(input: TokenStream) -> TokenStream {
 }
 
 /// Derive `ElmForm` for any struct.
+#[cfg(feature = "rocket")]
 #[proc_macro_derive(ElmForm)]
 pub fn derive_elm_form(input: TokenStream) -> TokenStream {
     rocket::derive_elm_form(input)
 }
 
 /// Derive `ElmFormParts` for any type other than empty enums, enums with variants that have fields, or unions.
+#[cfg(feature = "rocket")]
 #[proc_macro_derive(ElmFormParts)]
 pub fn derive_elm_form_parts(input: TokenStream) -> TokenStream {
     rocket::derive_elm_form_parts(input)
 }
 
+/// Intermediate representation of the derive input for more convenient handling.
 struct Intermediate {
     ident: Ident,
+    elm_type: String,
     generics: Generics,
+    generics_without_bounds: Generics,
     type_info: TypeInfo,
-}
-
-#[derive(Default)]
-struct ContainerAttributes {
-    serde_rename_all: Option<RenameAll>,
-    serde_enum_representation: Option<EnumRepresentation>,
-    serde_transparent: bool,
-}
-
-#[derive(Clone, Copy)]
-enum RenameAll {
-    Lowercase,
-    Uppercase,
-    PascalCase,
-    CamelCase,
-    SnakeCase,
-    ScreamingSnakeCase,
-    KebabCase,
-    ScreamingKebabCase,
-}
-
-enum Rename {
-    Container(RenameAll),
-    Field(String),
-}
-
-enum EnumRepresentation {
-    Tag(String),
-    TagContent(String, String),
-    Untagged,
-}
-
-#[derive(Default)]
-struct FieldAttributes {
-    serde_rename: Option<String>,
 }
 
 enum TypeInfo {
@@ -83,7 +58,7 @@ enum TypeInfo {
     Unit,
     // struct S(String);
     // "string"
-    Newtype(Box<Type>),
+    Newtype(Type),
     // struct S(String, u32);
     // []
     // ["string", 0]
@@ -97,47 +72,141 @@ enum TypeInfo {
     // enum E {
     //     Variant,
     // }
-    Enum(Vec<EnumVariant>),
+    Enum {
+        representation: EnumRepresentation,
+        variants: Vec<EnumVariant>,
+    },
 }
 
 struct StructField {
     ident: Ident,
     rename: Option<Rename>,
+    rename_deserialize: Option<Rename>,
+    rename_serialize: Option<Rename>,
+    skip: bool,
+    skip_deserializing: bool,
+    skip_serializing: bool,
+    aliases: Vec<String>,
     ty: Type,
 }
 
 impl StructField {
-    fn name<'a>(&'a self) -> Cow<'a, str> {
-        match &self.rename {
-            Some(Rename::Container(rename_all)) => match rename_all {
-                RenameAll::Lowercase => self.ident.to_string().to_lowercase().into(),
-                RenameAll::Uppercase => self.ident.to_string().to_uppercase().into(),
-                RenameAll::PascalCase => self.ident.to_string().to_mixed_case().into(),
-                RenameAll::CamelCase => self.ident.to_string().to_camel_case().into(),
-                RenameAll::SnakeCase => self.ident.to_string().to_snake_case().into(),
-                RenameAll::ScreamingSnakeCase => {
-                    self.ident.to_string().to_shouty_snake_case().into()
-                }
-                RenameAll::KebabCase => self.ident.to_string().to_kebab_case().into(),
-                RenameAll::ScreamingKebabCase => {
-                    self.ident.to_string().to_shouty_kebab_case().into()
-                }
-            },
+    /// The name in the Elm type definition. Always camelCased for consistency with Elm style guidelines.
+    fn name_elm<'a>(&'a self) -> Cow<'a, str> {
+        match self
+            .rename
+            .as_ref()
+            .or(self.rename_deserialize.as_ref())
+            .or(self.rename_serialize.as_ref())
+        {
+            Some(Rename::Field(rename)) => rename.to_lower_camel_case().into(),
+            _ => self.ident.to_string().to_lower_camel_case().into(),
+        }
+    }
+
+    /// The name when deserializing from JSON in Elm.
+    fn name_deserialize<'a>(&'a self) -> Cow<'a, str> {
+        match &self.rename_deserialize {
+            Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
             Some(Rename::Field(rename)) => rename.into(),
-            None => self.ident.to_string().into(),
+            None => match &self.rename {
+                Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
+                Some(Rename::Field(rename)) => rename.into(),
+                None => self.ident.to_string().into(),
+            },
+        }
+    }
+
+    /// The name when serializing to JSON in Elm.
+    fn name_serialize<'a>(&'a self) -> Cow<'a, str> {
+        match &self.rename_serialize {
+            Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
+            Some(Rename::Field(rename)) => rename.into(),
+            None => match &self.rename {
+                Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
+                Some(Rename::Field(rename)) => rename.into(),
+                None => self.ident.to_string().into(),
+            },
         }
     }
 }
 
-struct EnumVariant {
-    ident: Ident,
-    variant: EnumKind,
+enum Rename {
+    Container(RenameAll),
+    Field(String),
 }
 
-enum EnumKind {
+struct EnumVariant {
+    ident: Ident,
+    rename: Option<Rename>,
+    rename_deserialize: Option<Rename>,
+    rename_serialize: Option<Rename>,
+    skip: bool,
+    skip_deserializing: bool,
+    skip_serializing: bool,
+    other: bool,
+    variant: EnumVariantKind,
+    span: Span,
+}
+
+pub(crate) enum EnumRepresentation {
+    External,
+    Internal { tag: String },
+    Adjacent { tag: String, content: String },
+    Untagged,
+}
+
+impl Default for EnumRepresentation {
+    fn default() -> Self {
+        Self::External
+    }
+}
+
+impl EnumVariant {
+    /// The name in the Elm type definition. Always PascalCased for consistency with Elm style guidelines.
+    fn name_elm<'a>(&'a self) -> Cow<'a, str> {
+        match self
+            .rename
+            .as_ref()
+            .or(self.rename_deserialize.as_ref())
+            .or(self.rename_serialize.as_ref())
+        {
+            Some(Rename::Field(rename)) => rename.to_pascal_case().into(),
+            _ => self.ident.to_string().to_pascal_case().into(),
+        }
+    }
+
+    /// The name when deserializing from JSON in Elm.
+    fn name_deserialize<'a>(&'a self) -> Cow<'a, str> {
+        match &self.rename_deserialize {
+            Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
+            Some(Rename::Field(rename)) => rename.into(),
+            None => match &self.rename {
+                Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
+                Some(Rename::Field(rename)) => rename.into(),
+                None => self.ident.to_string().into(),
+            },
+        }
+    }
+
+    /// The name when serializing to JSON in Elm.
+    fn name_serialize<'a>(&'a self) -> Cow<'a, str> {
+        match &self.rename_serialize {
+            Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
+            Some(Rename::Field(rename)) => rename.into(),
+            None => match &self.rename {
+                Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
+                Some(Rename::Field(rename)) => rename.into(),
+                None => self.ident.to_string().into(),
+            },
+        }
+    }
+}
+
+enum EnumVariantKind {
     // Variant,
     // "Variant"
-    Unit,
+    Unit { other: bool },
     // Variant(String),
     // {"Variant": "string"}
     Newtype(Box<Type>),
@@ -154,225 +223,154 @@ enum EnumKind {
 }
 
 // parses the input to an intermediate representation that's convenient to turn into the end result
-fn derive_input_to_intermediate(input: DeriveInput) -> Intermediate {
+fn derive_input_to_intermediate(input: DeriveInput) -> Result<Intermediate, syn::Error> {
     let container_attributes = parse_container_attributes(&input.attrs);
-    let type_info = parse_type_info(input.data, &container_attributes);
-    Intermediate {
-        ident: input.ident,
-        generics: input.generics,
-        type_info,
+    let type_info = parse_type_info(input.data, container_attributes)?;
+
+    let elm_type = input.ident.to_string().to_pascal_case();
+    let mut generics_without_bounds = input.generics.clone();
+    for p in generics_without_bounds.type_params_mut() {
+        p.bounds = Punctuated::default();
     }
+    Ok(Intermediate {
+        ident: input.ident,
+        elm_type,
+        generics: input.generics,
+        generics_without_bounds,
+        type_info,
+    })
 }
 
-fn parse_type_info(data: Data, attributes: &ContainerAttributes) -> TypeInfo {
-    match data {
+fn parse_type_info(
+    data: Data,
+    container_attributes: ContainerAttributes,
+) -> Result<TypeInfo, syn::Error> {
+    let type_info = match data {
         Data::Struct(data_struct) => match data_struct.fields {
             Fields::Unit => TypeInfo::Unit,
             Fields::Unnamed(mut unnamed) => {
                 if unnamed.unnamed.len() == 1 {
-                    TypeInfo::Newtype(Box::new(unnamed.unnamed.pop().unwrap().into_value().ty))
+                    TypeInfo::Newtype(unnamed.unnamed.pop().unwrap().into_value().ty)
                 } else {
                     TypeInfo::Tuple(unnamed.unnamed.into_iter().map(|field| field.ty).collect())
                 }
             }
             Fields::Named(mut named) => {
-                if attributes.serde_transparent && named.named.len() == 1 {
-                    TypeInfo::Newtype(Box::new(named.named.pop().unwrap().into_value().ty))
+                if container_attributes.serde_transparent && named.named.len() == 1 {
+                    TypeInfo::Newtype(named.named.pop().unwrap().into_value().ty)
                 } else {
-                    TypeInfo::Struct(
-                        named
-                            .named
-                            .into_iter()
-                            .map(|field| {
-                                let ident = field.ident.unwrap();
-                                let field_attributes = parse_field_attributes(&field.attrs);
-                                StructField {
-                                    ident,
-                                    rename: field_attributes
-                                        .serde_rename
-                                        .map(Rename::Field)
-                                        .or(attributes.serde_rename_all.map(Rename::Container)),
-                                    ty: field.ty,
-                                }
-                            })
-                            .collect(),
-                    )
+                    TypeInfo::Struct(fields_named_to_struct_fields(named, &container_attributes))
                 }
             }
         },
         Data::Enum(DataEnum { variants, .. }) => {
             if variants.is_empty() {
-                panic!("empty enums are not supported");
+                return Err(syn::Error::new(
+                    variants.span(),
+                    "empty enums are not supported",
+                ));
             }
-            TypeInfo::Enum(
-                variants
-                    .into_iter()
-                    .map(|variant| {
-                        parse_variant_attributes(&variant.attrs);
-                        match variant.fields {
-                            Fields::Unit => EnumVariant {
-                                ident: variant.ident,
-                                variant: EnumKind::Unit,
-                            },
-                            Fields::Unnamed(mut unnamed) => {
-                                if unnamed.unnamed.len() == 1 {
-                                    EnumVariant {
-                                        ident: variant.ident,
-                                        variant: EnumKind::Newtype(Box::new(
-                                            unnamed.unnamed.pop().unwrap().into_value().ty,
-                                        )),
-                                    }
-                                } else {
-                                    EnumVariant {
-                                        ident: variant.ident,
-                                        variant: EnumKind::Tuple(
-                                            unnamed
-                                                .unnamed
-                                                .into_iter()
-                                                .map(|field| field.ty)
-                                                .collect(),
-                                        ),
-                                    }
-                                }
-                            }
-                            Fields::Named(named) => EnumVariant {
-                                ident: variant.ident,
-                                variant: EnumKind::Struct(
-                                    named
-                                        .named
-                                        .into_iter()
-                                        .map(|field| StructField {
-                                            ident: field.ident.unwrap(),
-                                            rename: attributes
-                                                .serde_rename_all
-                                                .map(Rename::Container),
-                                            ty: field.ty,
-                                        })
-                                        .collect(),
-                                ),
-                            },
-                        }
-                    })
-                    .collect(),
-            )
+            let variants = variants
+                .into_iter()
+                .map(|variant| parse_enum_variant(variant, &container_attributes))
+                .collect::<Result<_, _>>()?;
+
+            TypeInfo::Enum {
+                representation: container_attributes.serde_enum_representation,
+                variants,
+            }
         }
-        Data::Union(_) => panic!("unions are not supported"),
-    }
+        Data::Union(union) => {
+            return Err(syn::Error::new(
+                union.union_token.span(),
+                "unions are not supported",
+            ))
+        }
+    };
+    Ok(type_info)
 }
 
-fn parse_container_attributes(attrs: &[Attribute]) -> ContainerAttributes {
-    let mut attributes = ContainerAttributes::default();
-    for attr in attrs {
-        if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
-            if meta_list.path.is_ident("jalava") {
-                //
-            } else if meta_list.path.is_ident("serde") {
-                parse_serde_container_attributes(&mut attributes, meta_list);
-            } else if meta_list.path.is_ident("rocket") {
-                //
-            }
-        }
-    }
-    attributes
-}
-
-fn parse_serde_container_attributes(attributes: &mut ContainerAttributes, meta_list: MetaList) {
-    let mut nested = meta_list.nested.into_iter();
-    match nested.next() {
-        Some(NestedMeta::Meta(Meta::NameValue(name_value))) => {
-            if name_value.path.is_ident("rename_all") {
-                if let Lit::Str(rename_all) = name_value.lit {
-                    match rename_all.value().as_str() {
-                        "lowercase" => attributes.serde_rename_all = Some(RenameAll::Lowercase),
-                        "UPPERCASE" => attributes.serde_rename_all = Some(RenameAll::Uppercase),
-                        "PascalCase" => attributes.serde_rename_all = Some(RenameAll::PascalCase),
-                        "camelCase" => attributes.serde_rename_all = Some(RenameAll::CamelCase),
-                        "snake_case" => attributes.serde_rename_all = Some(RenameAll::SnakeCase),
-                        "SCREAMING_SNAKE_CASE" => {
-                            attributes.serde_rename_all = Some(RenameAll::ScreamingSnakeCase);
-                        }
-                        "kebab-case" => attributes.serde_rename_all = Some(RenameAll::KebabCase),
-                        "SCREAMING-KEBAB-CASE" => {
-                            attributes.serde_rename_all = Some(RenameAll::ScreamingKebabCase);
-                        }
-                        _ => {}
-                    }
-                }
-            } else if name_value.path.is_ident("tag") {
-                if let Lit::Str(tag) = name_value.lit {
-                    if let Some(NestedMeta::Meta(Meta::NameValue(inner_name_value))) = nested.next()
-                    {
-                        if inner_name_value.path.is_ident("content") {
-                            if let Lit::Str(content) = inner_name_value.lit {
-                                attributes.serde_enum_representation = Some(
-                                    EnumRepresentation::TagContent(tag.value(), content.value()),
-                                );
-                            }
-                        }
-                    } else {
-                        attributes.serde_enum_representation =
-                            Some(EnumRepresentation::Tag(tag.value()));
-                    }
-                }
-            } else if name_value.path.is_ident("content") {
-                if let Lit::Str(content) = name_value.lit {
-                    if let Some(NestedMeta::Meta(Meta::NameValue(inner_name_value))) = nested.next()
-                    {
-                        if inner_name_value.path.is_ident("tag") {
-                            if let Lit::Str(tag) = inner_name_value.lit {
-                                attributes.serde_enum_representation = Some(
-                                    EnumRepresentation::TagContent(content.value(), tag.value()),
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Some(NestedMeta::Lit(Lit::Str(s))) => match s.value().as_str() {
-            "untagged" => attributes.serde_enum_representation = Some(EnumRepresentation::Untagged),
-            "transparent" => attributes.serde_transparent = true,
-            _ => {}
+fn parse_enum_variant(
+    variant: Variant,
+    container_attributes: &ContainerAttributes,
+) -> Result<EnumVariant, syn::Error> {
+    let span = variant.span();
+    let variant_attributes = parse_variant_attributes(&variant.attrs);
+    let variant_kind = match variant.fields {
+        Fields::Unit => EnumVariantKind::Unit {
+            other: variant_attributes.serde_other,
         },
-        _ => {}
-    }
-}
-
-fn parse_variant_attributes(_attrs: &[Attribute]) -> () {
-    // todo
-}
-
-fn parse_field_attributes(attrs: &[Attribute]) -> FieldAttributes {
-    let mut attributes = FieldAttributes::default();
-
-    for attr in attrs {
-        if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
-            if meta_list.path.is_ident("jalava") {
-                //
-            } else if meta_list.path.is_ident("serde") {
-                parse_serde_field_attributes(&mut attributes, meta_list);
-            } else if meta_list.path.is_ident("rocket") {
-                //
-            }
+        Fields::Unnamed(mut unnamed) if unnamed.unnamed.len() == 1 => {
+            EnumVariantKind::Newtype(Box::new(unnamed.unnamed.pop().unwrap().into_value().ty))
         }
-    }
-
-    attributes
+        Fields::Unnamed(unnamed) => {
+            EnumVariantKind::Tuple(unnamed.unnamed.into_iter().map(|field| field.ty).collect())
+        }
+        Fields::Named(named) => {
+            EnumVariantKind::Struct(fields_named_to_struct_fields(named, container_attributes))
+        }
+    };
+    let variant = EnumVariant {
+        ident: variant.ident,
+        rename: variant_attributes
+            .serde_rename
+            .map(Rename::Field)
+            .or(variant_attributes.serde_rename_all.map(Rename::Container)),
+        rename_deserialize: variant_attributes
+            .serde_rename_deserialize
+            .map(Rename::Field)
+            .or(variant_attributes
+                .serde_rename_all_deserialize
+                .map(Rename::Container)),
+        rename_serialize: variant_attributes
+            .serde_rename_serialize
+            .map(Rename::Field)
+            .or(variant_attributes
+                .serde_rename_all_serialize
+                .map(Rename::Container)),
+        skip: variant_attributes.serde_skip,
+        skip_deserializing: variant_attributes.serde_skip_deserializing,
+        skip_serializing: variant_attributes.serde_skip_serializing,
+        other: variant_attributes.serde_other,
+        variant: variant_kind,
+        span,
+    };
+    Ok(variant)
 }
 
-fn parse_serde_field_attributes(attributes: &mut FieldAttributes, meta_list: MetaList) {
-    let mut nested = meta_list.nested.into_iter();
-    match nested.next() {
-        Some(NestedMeta::Meta(Meta::NameValue(name_value))) => {
-            if name_value.path.is_ident("rename") {
-                if let Lit::Str(rename) = name_value.lit {
-                    attributes.serde_rename = Some(rename.value())
-                }
+fn fields_named_to_struct_fields(
+    named: FieldsNamed,
+    container_attributes: &ContainerAttributes,
+) -> Vec<StructField> {
+    named
+        .named
+        .into_iter()
+        .map(|field| {
+            let field_attributes = parse_field_attributes(&field.attrs);
+            StructField {
+                ident: field.ident.unwrap(),
+                rename: field_attributes
+                    .serde_rename
+                    .map(Rename::Field)
+                    .or(container_attributes.serde_rename_all.map(Rename::Container)),
+                rename_deserialize: field_attributes
+                    .serde_rename_deserialize
+                    .map(Rename::Field)
+                    .or(container_attributes
+                        .serde_rename_all_deserialize
+                        .map(Rename::Container)),
+                rename_serialize: field_attributes
+                    .serde_rename_serialize
+                    .map(Rename::Field)
+                    .or(container_attributes
+                        .serde_rename_all_serialize
+                        .map(Rename::Container)),
+                skip: field_attributes.serde_skip,
+                skip_deserializing: field_attributes.serde_skip_deserializing,
+                skip_serializing: field_attributes.serde_skip_serializing,
+                aliases: field_attributes.serde_aliases,
+                ty: field.ty,
             }
-        }
-        Some(NestedMeta::Lit(Lit::Str(s))) => match s.value().as_str() {
-            _ => {}
-        },
-        _ => {}
-    }
+        })
+        .collect()
 }

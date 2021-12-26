@@ -45,3 +45,7 @@ fn main() {
     );
     println!("{}", elm_types);
 }
+
+#[derive(Elm, serde::Serialize)]
+#[serde(rename(serialize = ""))]
+struct Asd;

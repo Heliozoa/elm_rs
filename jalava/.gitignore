@@ -1,4 +1,3 @@
 tests/elm/elm-stuff
 tests/elm/index.html
-tests/elm/src/JsonBindings.elm
 tests/elm/src/FormBindings.elm

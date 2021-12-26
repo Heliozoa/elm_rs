@@ -5,7 +5,7 @@ cargo +nightly fmt
 ```
 
 ### Testing
-The tests use optional dependencies, so `--all-features` is needed. At the moment the test for forms requires manual interaction by opening a browser so it's ignored.
+The tests use optional dependencies, so `--all-features` is needed. At the moment the test for forms requires manual interaction by opening a browser so it's ignored. The tests use `elm repl` so Elm has to be installed.
 
 ```console
 cargo test --all-features -- --include-ignored --nocapture

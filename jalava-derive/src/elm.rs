@@ -1,13 +1,17 @@
-use super::{EnumKind, EnumVariant, Intermediate, StructField, TypeInfo};
-use heck::CamelCase;
+//! Derive macro for Elm.
+
+use super::{EnumVariant, EnumVariantKind, Intermediate, StructField, TypeInfo};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, punctuated::Punctuated, DeriveInput, Type};
+use syn::{parse_macro_input, DeriveInput, Type};
 
 pub fn derive_elm(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
-    let intermediate = super::derive_input_to_intermediate(derive_input);
+    let intermediate = match super::derive_input_to_intermediate(derive_input) {
+        Ok(intermediate) => intermediate,
+        Err(err) => return err.to_compile_error().into(),
+    };
     let token_stream = intermediate_to_token_stream(intermediate);
     TokenStream::from(token_stream)
 }
@@ -15,34 +19,32 @@ pub fn derive_elm(input: TokenStream) -> TokenStream {
 fn intermediate_to_token_stream(
     Intermediate {
         ident,
-        generics,
-        type_info: kind,
+        elm_type,
+        mut generics,
+        generics_without_bounds,
+        type_info,
     }: Intermediate,
 ) -> TokenStream2 {
-    let elm_type = ident.to_string().to_camel_case();
-
-    let type_definition = match kind {
+    let type_definition = match type_info {
         TypeInfo::Unit => unit(&elm_type),
         TypeInfo::Newtype(ty) => newtype(&elm_type, &ty),
         TypeInfo::Tuple(tys) => tuple(&elm_type, &tys),
         TypeInfo::Struct(fields) => struct_type(&elm_type, fields),
-        TypeInfo::Enum(variants) => enum_type(&elm_type, variants),
+        TypeInfo::Enum { variants, .. } => enum_type(&elm_type, variants),
     };
 
-    // prepare a list of generics without any bounds
-    let mut without_bounds = generics.clone();
-    for param in without_bounds.type_params_mut() {
-        param.bounds = Punctuated::default();
+    for p in generics.type_params_mut() {
+        p.bounds.push(syn::parse_str("::jalava::Elm").unwrap());
     }
 
     quote! {
-        impl #generics jalava::Elm for #ident #without_bounds {
-            fn elm_type() -> String {
-                #elm_type.to_string()
+        impl #generics ::jalava::Elm for #ident #generics_without_bounds {
+            fn elm_type() -> ::std::string::String {
+                ::std::string::String::from(#elm_type)
             }
 
-            fn elm_definition() -> Option<String> {
-                Some(#type_definition)
+            fn elm_definition() -> ::std::option::Option<::std::string::String> {
+                ::std::option::Option::Some(#type_definition)
             }
         }
     }
@@ -63,7 +65,7 @@ type {elm_type}
     = {elm_type} ({inner_type})
 ",
         elm_type = #elm_type,
-        inner_type = <#ty>::elm_type(),
+        inner_type = <#ty as ::jalava::Elm>::elm_type(),
     )}
 }
 
@@ -73,12 +75,17 @@ type {elm_type}
     = {elm_type} {types}
 ",
         elm_type = #elm_type,
-        types = (&[#(format!("({})", <#ts>::elm_type())),*] as &[String]).join(" "),
+        types =
+            (
+                &[
+                    #(format!("({})", <#ts as ::jalava::Elm>::elm_type())),*
+                ] as &[String]
+            ).join(" "),
     )}
 }
 
 fn struct_type(elm_type: &str, fields: Vec<StructField>) -> TokenStream2 {
-    let ids = fields.iter().map(|field| field.name());
+    let ids = fields.iter().map(|field| field.name_elm());
     let tys = fields.iter().map(|field| &field.ty);
     quote! {format!("\
 type alias {elm_type} =
@@ -86,28 +93,59 @@ type alias {elm_type} =
     }}
 ", 
         elm_type = #elm_type,
-        fields = (&[#(format!("{} : {}", #ids, <#tys>::elm_type())),*] as &[String]).join("\n    , "),
+        fields =
+            (
+                &[
+                    #(format!("{} : {}", #ids, <#tys as ::jalava::Elm>::elm_type())),*
+                ] as &[::std::string::String]
+            ).join("\n    , "),
     )}
 }
 
-fn enum_type(elm_type: &str, variants: Vec<EnumVariant>) -> TokenStream2 {
+fn enum_type(elm_type: &str, enum_variants: Vec<EnumVariant>) -> TokenStream2 {
     let mut enum_fields: Vec<TokenStream2> = vec![];
-    for variant in variants {
-        let id = variant.ident.to_string().to_camel_case();
-        match variant.variant {
-            EnumKind::Unit => {
-                enum_fields.push(quote! {#id});
+    for enum_variant in enum_variants {
+        let variant_elm_name = enum_variant.name_elm();
+        match &enum_variant.variant {
+            EnumVariantKind::Unit { .. } => {
+                let field = quote! {
+                    #variant_elm_name
+                };
+                enum_fields.push(field);
             }
-            EnumKind::Newtype(ty) => {
-                enum_fields.push(quote! {format!("{} ({})", #id, <#ty>::elm_type())});
+            EnumVariantKind::Newtype(ty) => {
+                let field = quote! {
+                    format!("{} ({})", #variant_elm_name, <#ty as ::jalava::Elm>::elm_type())
+                };
+                enum_fields.push(field);
             }
-            EnumKind::Tuple(tys) => enum_fields.push(
-                    quote! {format!("{} {}", #id, (&[#(format!("({})", <#tys>::elm_type())),*] as &[String]).join(" "))},
-                ),
-            EnumKind::Struct(fields) => {
-                let ids = fields.iter().map(|field| field.name());
+            EnumVariantKind::Tuple(tys) => {
+                let field = quote! {
+                    format!("{name} {types}",
+                        name = #variant_elm_name,
+                        types =
+                            (
+                                &[
+                                    #(format!("({})", <#tys as ::jalava::Elm>::elm_type())),*
+                                ] as &[::std::string::String]
+                            ).join(" "))
+                };
+                enum_fields.push(field);
+            }
+            EnumVariantKind::Struct(fields) => {
+                let ids = fields.iter().map(|field| field.name_elm());
                 let tys = fields.iter().map(|field| &field.ty);
-                enum_fields.push(quote! {format!("{} {{ {} }}", #id, (&[#(format!("{} : {}", #ids, <#tys>::elm_type())),*] as &[String]).join(", "))});
+                let field = quote! {
+                    format!("{name} {{ {fields} }}",
+                    name = #variant_elm_name,
+                    fields =
+                        (
+                            &[
+                                #(format!("{} : {}", #ids, <#tys as ::jalava::Elm>::elm_type())),*
+                            ] as &[::std::string::String]
+                        ).join(", "))
+                };
+                enum_fields.push(field);
             }
         }
     }
@@ -116,6 +154,11 @@ type {elm_type}
     = {enum_fields}
 ", 
         elm_type = #elm_type,
-        enum_fields = (&[#(format!("{}", #enum_fields)),*] as &[String]).join("\n    | "),
+        enum_fields =
+            (
+                &[
+                    #(format!("{}", #enum_fields)),*
+                ] as &[::std::string::String]
+            ).join("\n    | "),
     )}
 }

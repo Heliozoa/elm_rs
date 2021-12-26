@@ -4,6 +4,11 @@ mod elm;
 mod json;
 #[cfg(feature = "rocket")]
 mod rocket;
+#[cfg(test)]
+mod test;
+
+#[cfg(test)]
+extern crate self as jalava;
 
 #[cfg(feature = "rocket")]
 pub use self::rocket::{ElmForm, ElmFormParts};
