@@ -1,7 +1,5 @@
 //! Derive macros for ElmJson.
 
-use std::borrow::Cow;
-
 use super::{EnumVariantKind, Intermediate, TypeInfo};
 use crate::{EnumRepresentation, EnumVariant, StructField};
 use heck::ToLowerCamelCase;
@@ -222,15 +220,9 @@ fn struct_named(
     for field in fields {
         let ty = &field.ty;
         let field_name_deserialize = field.name_deserialize();
-        let alias_decoders = field
-            .aliases
-            .iter()
-            .map(|a| quote! {format!(", Json.Decode.field \"{}\" ({})", #a, <#ty>::decoder_type())})
-            .collect::<Vec<_>>();
-        field_decoders.push(quote!{format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.oneOf [Json.Decode.field \"{field_name_deserialize}\" ({decoder}){alias_decoders}]))",
+        field_decoders.push(quote!{format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.oneOf [Json.Decode.field \"{field_name_deserialize}\" ({decoder})]))",
                 field_name_deserialize = #field_name_deserialize,
                 decoder = <#ty>::decoder_type(),
-                alias_decoders = (&[#(#alias_decoders),*] as &[String]).join("")
         )});
     }
     let decoder = quote! {format!("\
@@ -248,9 +240,18 @@ fn struct_named(
         ).join("\n        "),
     )};
 
-    let field_names = fields.iter().map(|field| field.name_elm());
-    let field_names_serialize = fields.iter().map(|field| field.name_serialize());
-    let tys = fields.iter().map(|field| &field.ty);
+    let mut field_encoders = vec![];
+    for field in fields {
+        let field_name = field.name_elm();
+        let field_name_serialize = field.name_serialize();
+        let ty = &field.ty;
+        field_encoders.push(
+            quote! {format!("( \"{field_name_serialize}\", ({encoder}) struct.{field_name} )",
+            field_name_serialize = #field_name_serialize,
+            encoder = <#ty>::encoder_type(),
+            field_name = #field_name)},
+        )
+    }
     let encoder = quote! {format!("\
 {encoder_type} : {elm_type} -> Json.Encode.Value
 {encoder_type} struct =
@@ -262,10 +263,7 @@ fn struct_named(
         encoder_type = #encoder_type,
         fields = (
             &[
-                #(format!("( \"{field_name_serialize}\", ({encoder}) struct.{field_name} )",
-                    field_name_serialize = #field_names_serialize,
-                    encoder = <#tys>::encoder_type(),
-                    field_name = #field_names)),*
+                #(#field_encoders),*
             ] as &[String]
         ).join("\n        , "),
     )};
@@ -298,21 +296,22 @@ fn enum_external(
     let mut encoders = vec![];
     let mut decoders = vec![];
     let mut constructors = vec![];
+    let mut other_decoder = None;
     for variant in variants {
+        if variant.skip {
+            continue;
+        }
+
         let elm_name = variant.name_elm();
         let elm_name_serialize = variant.name_serialize();
         let elm_name_deserialize = variant.name_deserialize();
+        if variant.other {
+            other_decoder = Some(quote! {format!("Json.Decode.succeed {}", #elm_name_deserialize)});
+        }
+
         let coder = match &variant.variant {
-            EnumVariantKind::Unit { other } => {
-                if *other {
-                    todo!()
-                } else {
-                    enum_variant_unit_external(
-                        &elm_name,
-                        &elm_name_serialize,
-                        &elm_name_deserialize,
-                    )
-                }
+            EnumVariantKind::Unit => {
+                enum_variant_unit_external(&elm_name, &elm_name_serialize, &elm_name_deserialize)
             }
             EnumVariantKind::Newtype(inner) => enum_variant_newtype_external(
                 &elm_name,
@@ -339,6 +338,9 @@ fn enum_external(
         };
         encoders.push(coder.encoder);
         decoders.push(coder.decoder);
+    }
+    if let Some(other_decoder) = other_decoder {
+        decoders.push(other_decoder)
     }
 
     let encoder = quote! {format!("\
@@ -407,23 +409,28 @@ fn enum_internal(
     let mut encoders = vec![];
     let mut decoders = vec![];
     let mut constructors = vec![];
+    let mut other_decoder = None;
     for variant in variants {
+        if variant.skip {
+            continue;
+        }
+
         let elm_name = variant.name_elm();
         let elm_name_serialize = variant.name_serialize();
         let elm_name_deserialize = variant.name_deserialize();
+        if variant.other {
+            other_decoder = Some(quote! {format!("\
+_ ->
+                Json.Decode.succeed {}", #elm_name_deserialize)});
+        }
+
         let coder = match &variant.variant {
-            EnumVariantKind::Unit { other } => {
-                if *other {
-                    todo!()
-                } else {
-                    enum_variant_unit_internal_or_adjacent(
-                        tag,
-                        &elm_name,
-                        &elm_name_serialize,
-                        &elm_name_deserialize,
-                    )
-                }
-            }
+            EnumVariantKind::Unit => enum_variant_unit_internal_or_adjacent(
+                tag,
+                &elm_name,
+                &elm_name_serialize,
+                &elm_name_deserialize,
+            ),
             EnumVariantKind::Newtype(_) => {
                 return Err(syn::Error::new(
                     variant.span,
@@ -450,6 +457,9 @@ fn enum_internal(
         };
         encoders.push(coder.encoder);
         decoders.push(coder.decoder);
+    }
+    if let Some(other_decoder) = other_decoder {
+        decoders.push(other_decoder)
     }
 
     let encoder = quote! {format!("\
@@ -525,23 +535,28 @@ fn enum_adjacent(
     let mut encoders = vec![];
     let mut decoders = vec![];
     let mut constructors = vec![];
+    let mut other_decoder = None;
     for variant in variants {
+        if variant.skip {
+            continue;
+        }
+
         let elm_name = variant.name_elm();
         let elm_name_serialize = variant.name_serialize();
         let elm_name_deserialize = variant.name_deserialize();
+        if variant.other {
+            other_decoder = Some(quote! {format!("\
+_ ->
+                Json.Decode.succeed {}", #elm_name_deserialize)});
+        }
+
         let coder = match &variant.variant {
-            EnumVariantKind::Unit { other } => {
-                if *other {
-                    todo!()
-                } else {
-                    enum_variant_unit_internal_or_adjacent(
-                        tag,
-                        &elm_name,
-                        &elm_name_serialize,
-                        &elm_name_deserialize,
-                    )
-                }
-            }
+            EnumVariantKind::Unit => enum_variant_unit_internal_or_adjacent(
+                tag,
+                &elm_name,
+                &elm_name_serialize,
+                &elm_name_deserialize,
+            ),
             EnumVariantKind::Newtype(inner) => enum_variant_newtype_adjacent(
                 tag,
                 content,
@@ -573,6 +588,9 @@ fn enum_adjacent(
         };
         encoders.push(coder.encoder);
         decoders.push(coder.decoder);
+    }
+    if let Some(other_decoder) = other_decoder {
+        decoders.push(other_decoder)
     }
 
     let encoder = quote! {format!("\
@@ -647,9 +665,13 @@ fn enum_untagged(
     let mut decoders = vec![];
     let mut constructors = vec![];
     for variant in variants {
+        if variant.skip {
+            continue;
+        }
+
         let elm_name = variant.name_elm();
         let coder = match &variant.variant {
-            EnumVariantKind::Unit { other: _ } => enum_variant_unit_untagged(&elm_name),
+            EnumVariantKind::Unit => enum_variant_unit_untagged(&elm_name),
             EnumVariantKind::Newtype(inner) => enum_variant_newtype_untagged(&elm_name, inner),
             EnumVariantKind::Tuple(types) => enum_variant_tuple_untagged(&elm_name, types),
             EnumVariantKind::Struct(fields) => {
@@ -694,8 +716,8 @@ fn enum_untagged(
 {decoder_name} : Json.Decode.Decoder {elm_type}
 {decoder_name} = {constructors}
     Json.Decode.oneOf
-    [ {decoders}
-    ]",
+        [ {decoders}
+        ]",
         decoder_name = #decoder_name,
         elm_type = #elm_type,
         constructors = #constructors,
@@ -1310,7 +1332,7 @@ fn enum_variant_struct_untagged(
 // helpers
 // #######
 
-fn constructor(variant_name: &str, field_names: &[Cow<'_, str>]) -> TokenStream2 {
+fn constructor(variant_name: &str, field_names: &[String]) -> TokenStream2 {
     quote! {format!("\
 construct{enum_variant} {fields} =
                         {enum_variant} {{ {setters} }}",

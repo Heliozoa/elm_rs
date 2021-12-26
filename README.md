@@ -113,6 +113,23 @@ prepareDrawing form =
             ]
 ```
 
+### Serde compatibility
+The `serde-compat` feature enables compatibility with serde attributes. Currently the following attributes are supported:
+#### Container attributes
+- rename_all
+- tag
+- tag & content
+- untagged
+- transparent
+#### Variant attributes
+- rename
+- rename_all
+- skip
+- other
+#### Field attributes
+- rename
+- skip
+
 ### Notes
 Note that many attributes that are used to configure the derive macros of `Serialize`, `Deserialize` or `FromForm` are not taken into account yet.
 
@@ -121,20 +138,21 @@ Note that many attributes that are used to configure the derive macros of `Seria
 - [x] Generate JSON encoders and decoders with the `ElmJson` trait and derive macro
 - [x] Generate Elm functions that create multipart requests compatible with Rocket's multipart form parsing through the `rocket::{ElmForm, ElmFormField}` traits and derive macros
 - [x] Basic generic support
-- [x] Compatibility with serde container attributes
-- [ ] Compatibility with serde variant attributes
-- [ ] Compatibility with serde field attributes
-- [ ] Compatibility with rocket attributes (e.g. `field`)
+- [x] Compatibility with most serde attributes
 
 ### Planned
+- [ ] Compatibility with more complicated serde attributes
+  - [ ] flatten
+  - [ ] alias
+  - [ ] skip_(de)serializing
 - [ ] Optionally include definitions for the dependencies of exported types
-- [ ] Implement support for as many `serde::{Deserialize, Serialize}` std types as possible
+- [ ] Implement support for more `serde::{Deserialize, Serialize}` std types
   - [ ] IpAddr, Ipv4Addr, Ipv6Addr
   - [ ] SocketAddr, SocketAddrV4, SocketAddrV6
   - [ ] PhantomData
 - [ ] Handle recursive types
-- [ ] Improve generated code
 - [ ] Improve generic support
+- [ ] Compatibility with rocket attributes (e.g. `field`)
 - [ ] Attributes for controlling the name of the Elm type etc.
 
 ### License

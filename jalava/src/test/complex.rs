@@ -34,12 +34,17 @@ struct S2 {
 fn complex() {
     super::test_with_deps(
         S2 {
-            fe: vec![E::Unit],
+            fe: vec![E::Unit, E::Newtype(0), E::Tuple(0, 0), E::Named { u8: 0 }],
             fs: vec![S {
-                e1: vec![],
-                e2: vec![],
+                e1: vec![E::Unit, E::Newtype(0), E::Tuple(0, 0), E::Named { u8: 0 }],
+                e2: vec![E::Unit, E::Newtype(0), E::Tuple(0, 0), E::Named { u8: 0 }],
             }],
-            fe2: vec![E2::E2e(vec![])],
+            fe2: vec![E2::E2e(vec![
+                E::Unit,
+                E::Newtype(0),
+                E::Tuple(0, 0),
+                E::Named { u8: 0 },
+            ])],
         },
         &format!(
             "\

@@ -13,7 +13,7 @@ use proc_macro2::Span;
 use std::borrow::Cow;
 use syn::{
     punctuated::Punctuated, spanned::Spanned, Data, DataEnum, DeriveInput, Fields, FieldsNamed,
-    Generics, Ident, Path, TraitBound, Type, TypeParamBound, Variant,
+    Generics, Ident, Type, Variant,
 };
 
 /// Derive `Elm` for any type with fields that all implement `Elm`
@@ -83,28 +83,18 @@ struct StructField {
     rename: Option<Rename>,
     rename_deserialize: Option<Rename>,
     rename_serialize: Option<Rename>,
-    skip: bool,
-    skip_deserializing: bool,
-    skip_serializing: bool,
     aliases: Vec<String>,
     ty: Type,
 }
 
 impl StructField {
     /// The name in the Elm type definition. Always camelCased for consistency with Elm style guidelines.
-    fn name_elm<'a>(&'a self) -> Cow<'a, str> {
-        match self
-            .rename
-            .as_ref()
-            .or(self.rename_deserialize.as_ref())
-            .or(self.rename_serialize.as_ref())
-        {
-            Some(Rename::Field(rename)) => rename.to_lower_camel_case().into(),
-            _ => self.ident.to_string().to_lower_camel_case().into(),
-        }
+    fn name_elm<'a>(&'a self) -> String {
+        self.ident.to_string().to_lower_camel_case()
     }
 
     /// The name when deserializing from JSON in Elm.
+    /// The name when serializing to JSON in Rust.
     fn name_deserialize<'a>(&'a self) -> Cow<'a, str> {
         match &self.rename_deserialize {
             Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
@@ -118,6 +108,7 @@ impl StructField {
     }
 
     /// The name when serializing to JSON in Elm.
+    /// The name when deserializing from JSON in Rust.
     fn name_serialize<'a>(&'a self) -> Cow<'a, str> {
         match &self.rename_serialize {
             Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
@@ -139,11 +130,11 @@ enum Rename {
 struct EnumVariant {
     ident: Ident,
     rename: Option<Rename>,
+    // corresponds to serde's rename serialize
     rename_deserialize: Option<Rename>,
+    // corresponds to serde's rename deserialize
     rename_serialize: Option<Rename>,
     skip: bool,
-    skip_deserializing: bool,
-    skip_serializing: bool,
     other: bool,
     variant: EnumVariantKind,
     span: Span,
@@ -165,18 +156,11 @@ impl Default for EnumRepresentation {
 impl EnumVariant {
     /// The name in the Elm type definition. Always PascalCased for consistency with Elm style guidelines.
     fn name_elm<'a>(&'a self) -> Cow<'a, str> {
-        match self
-            .rename
-            .as_ref()
-            .or(self.rename_deserialize.as_ref())
-            .or(self.rename_serialize.as_ref())
-        {
-            Some(Rename::Field(rename)) => rename.to_pascal_case().into(),
-            _ => self.ident.to_string().to_pascal_case().into(),
-        }
+        self.ident.to_string().to_pascal_case().into()
     }
 
     /// The name when deserializing from JSON in Elm.
+    /// The name when serializing to JSON in Rust.
     fn name_deserialize<'a>(&'a self) -> Cow<'a, str> {
         match &self.rename_deserialize {
             Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
@@ -190,6 +174,7 @@ impl EnumVariant {
     }
 
     /// The name when serializing to JSON in Elm.
+    /// The name when deserializing from JSON in Rust.
     fn name_serialize<'a>(&'a self) -> Cow<'a, str> {
         match &self.rename_serialize {
             Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
@@ -206,7 +191,7 @@ impl EnumVariant {
 enum EnumVariantKind {
     // Variant,
     // "Variant"
-    Unit { other: bool },
+    Unit,
     // Variant(String),
     // {"Variant": "string"}
     Newtype(Box<Type>),
@@ -297,9 +282,7 @@ fn parse_enum_variant(
     let span = variant.span();
     let variant_attributes = parse_variant_attributes(&variant.attrs);
     let variant_kind = match variant.fields {
-        Fields::Unit => EnumVariantKind::Unit {
-            other: variant_attributes.serde_other,
-        },
+        Fields::Unit => EnumVariantKind::Unit,
         Fields::Unnamed(mut unnamed) if unnamed.unnamed.len() == 1 => {
             EnumVariantKind::Newtype(Box::new(unnamed.unnamed.pop().unwrap().into_value().ty))
         }
@@ -315,22 +298,27 @@ fn parse_enum_variant(
         rename: variant_attributes
             .serde_rename
             .map(Rename::Field)
-            .or(variant_attributes.serde_rename_all.map(Rename::Container)),
+            .or(variant_attributes.serde_rename_all.map(Rename::Container))
+            .or(container_attributes.serde_rename_all.map(Rename::Container)),
         rename_deserialize: variant_attributes
-            .serde_rename_deserialize
-            .map(Rename::Field)
-            .or(variant_attributes
-                .serde_rename_all_deserialize
-                .map(Rename::Container)),
-        rename_serialize: variant_attributes
             .serde_rename_serialize
             .map(Rename::Field)
             .or(variant_attributes
                 .serde_rename_all_serialize
+                .map(Rename::Container))
+            .or(container_attributes
+                .serde_rename_all_serialize
+                .map(Rename::Container)),
+        rename_serialize: variant_attributes
+            .serde_rename_deserialize
+            .map(Rename::Field)
+            .or(variant_attributes
+                .serde_rename_all_deserialize
+                .map(Rename::Container))
+            .or(container_attributes
+                .serde_rename_all_deserialize
                 .map(Rename::Container)),
         skip: variant_attributes.serde_skip,
-        skip_deserializing: variant_attributes.serde_skip_deserializing,
-        skip_serializing: variant_attributes.serde_skip_serializing,
         other: variant_attributes.serde_other,
         variant: variant_kind,
         span,
@@ -347,30 +335,29 @@ fn fields_named_to_struct_fields(
         .into_iter()
         .map(|field| {
             let field_attributes = parse_field_attributes(&field.attrs);
-            StructField {
-                ident: field.ident.unwrap(),
-                rename: field_attributes
-                    .serde_rename
-                    .map(Rename::Field)
-                    .or(container_attributes.serde_rename_all.map(Rename::Container)),
-                rename_deserialize: field_attributes
-                    .serde_rename_deserialize
-                    .map(Rename::Field)
-                    .or(container_attributes
-                        .serde_rename_all_deserialize
-                        .map(Rename::Container)),
-                rename_serialize: field_attributes
-                    .serde_rename_serialize
-                    .map(Rename::Field)
-                    .or(container_attributes
-                        .serde_rename_all_serialize
-                        .map(Rename::Container)),
-                skip: field_attributes.serde_skip,
-                skip_deserializing: field_attributes.serde_skip_deserializing,
-                skip_serializing: field_attributes.serde_skip_serializing,
-                aliases: field_attributes.serde_aliases,
-                ty: field.ty,
-            }
+            (field, field_attributes)
+        })
+        .filter(|(_, field_attributes)| !field_attributes.serde_skip)
+        .map(|(field, field_attributes)| StructField {
+            ident: field.ident.unwrap(),
+            rename: field_attributes
+                .serde_rename
+                .map(Rename::Field)
+                .or(container_attributes.serde_rename_all.map(Rename::Container)),
+            rename_deserialize: field_attributes
+                .serde_rename_serialize
+                .map(Rename::Field)
+                .or(container_attributes
+                    .serde_rename_all_serialize
+                    .map(Rename::Container)),
+            rename_serialize: field_attributes
+                .serde_rename_deserialize
+                .map(Rename::Field)
+                .or(container_attributes
+                    .serde_rename_all_deserialize
+                    .map(Rename::Container)),
+            aliases: field_attributes.serde_aliases,
+            ty: field.ty,
         })
         .collect()
 }

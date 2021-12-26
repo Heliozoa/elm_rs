@@ -9,12 +9,6 @@ use syn::{Attribute, Meta};
 
 #[derive(Default)]
 pub(crate) struct ContainerAttributes {
-    /*
-    unused, JSON doesn't use type names
-    pub serde_rename: Option<String>,
-    pub serde_rename_deserialize: Option<String>,
-    pub serde_rename_serialize: Option<String>,
-    */
     pub serde_rename_all: Option<RenameAll>,
     pub serde_rename_all_deserialize: Option<RenameAll>,
     pub serde_rename_all_serialize: Option<RenameAll>,
@@ -73,8 +67,6 @@ pub struct VariantAttributes {
     pub serde_rename_all_serialize: Option<RenameAll>,
     pub serde_aliases: Vec<String>,
     pub serde_skip: bool,
-    pub serde_skip_deserializing: bool,
-    pub serde_skip_serializing: bool,
     pub serde_other: bool,
 }
 
@@ -86,8 +78,6 @@ pub struct FieldAttributes {
     pub serde_aliases: Vec<String>,
     pub serde_flatten: bool,
     pub serde_skip: bool,
-    pub serde_skip_deserializing: bool,
-    pub serde_skip_serializing: bool,
 }
 
 pub(crate) fn parse_container_attributes(attrs: &[Attribute]) -> ContainerAttributes {
@@ -148,7 +138,7 @@ mod serde {
     use crate::EnumRepresentation;
 
     use super::*;
-    use syn::{Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path, PathSegment};
+    use syn::{Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
 
     pub(super) fn parse_container_attributes(
         attributes: &mut ContainerAttributes,
@@ -157,25 +147,7 @@ mod serde {
         let mut nested = meta_list.nested.into_iter().peekable();
         match nested.next() {
             Some(NestedMeta::Meta(Meta::List(list))) => {
-                if list.path.is_ident("rename") {
-                    /*
-                    unused, JSON doesn't use type names
-                    for nested in list.nested {
-                        if let NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                            path,
-                            lit: Lit::Str(rename),
-                            ..
-                        })) = nested
-                        {
-                            if path.is_ident("deserialize") {
-                                attributes.serde_rename_deserialize = Some(rename.value());
-                            } else if path.is_ident("serialize") {
-                                attributes.serde_rename_serialize = Some(rename.value());
-                            }
-                        }
-                    }
-                    */
-                } else if list.path.is_ident("rename_all") {
+                if list.path.is_ident("rename_all") {
                     for nested in list.nested {
                         if let NestedMeta::Meta(Meta::NameValue(MetaNameValue {
                             path,
@@ -236,16 +208,16 @@ mod serde {
                 }
             }
             Some(NestedMeta::Meta(Meta::Path(Path { segments, .. }))) => {
-                if let Some(PathSegment { ident, .. }) = segments.first() {
-                    if ident == "untagged" {
-                        attributes.serde_enum_representation = EnumRepresentation::Untagged
+                for segment in segments {
+                    match segment.ident.to_string().as_str() {
+                        "transparent" => attributes.serde_transparent = true,
+                        "untagged" => {
+                            attributes.serde_enum_representation = EnumRepresentation::Untagged
+                        }
+                        _ => {}
                     }
                 }
             }
-            Some(NestedMeta::Lit(Lit::Str(s))) => match s.value().as_str() {
-                "transparent" => attributes.serde_transparent = true,
-                _ => {}
-            },
             _ => {}
         }
     }
@@ -305,13 +277,15 @@ mod serde {
                     }
                 }
             }
-            Some(NestedMeta::Lit(Lit::Str(s))) => match s.value().as_str() {
-                "skip" => attributes.serde_skip = true,
-                "skip_deserializing" => attributes.serde_skip_deserializing = true,
-                "skip_serializing" => attributes.serde_skip_serializing = true,
-                "other" => attributes.serde_other = true,
-                _ => {}
-            },
+            Some(NestedMeta::Meta(Meta::Path(Path { segments, .. }))) => {
+                for segment in segments {
+                    match segment.ident.to_string().as_str() {
+                        "other" => attributes.serde_other = true,
+                        "skip" => attributes.serde_skip = true,
+                        _ => {}
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -348,13 +322,13 @@ mod serde {
                     }
                 }
             }
-            Some(NestedMeta::Lit(Lit::Str(s))) => match s.value().as_str() {
-                "flatten" => attributes.serde_flatten = true,
-                "skip" => attributes.serde_skip = true,
-                "skip_deserializing" => attributes.serde_skip_deserializing = true,
-                "skip_serializing" => attributes.serde_skip_serializing = true,
-                _ => {}
-            },
+            Some(NestedMeta::Meta(Meta::Path(path))) => {
+                if path.is_ident("flatten") {
+                    attributes.serde_flatten = true
+                } else if path.is_ident("skip") {
+                    attributes.serde_skip = true
+                }
+            }
             _ => {}
         }
     }
