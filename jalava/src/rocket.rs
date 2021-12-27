@@ -70,7 +70,9 @@ macro_rules! impl_stringpart {
             fn form_parts_inner(field: &str, path: &str, _recursion: u32) -> String {
                 ::std::format!(
                     r#"[ Http.stringPart ("{}") ({} {}) ]"#,
-                    field, $to_string, path
+                    field,
+                    $to_string,
+                    path
                 )
             }
         }

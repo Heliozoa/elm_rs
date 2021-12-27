@@ -2,7 +2,7 @@
 
 mod elm;
 mod json;
-#[cfg(feature = "rocket")]
+#[cfg(feature = "rocket-compat")]
 mod rocket;
 #[cfg(test)]
 mod test;
@@ -10,7 +10,7 @@ mod test;
 #[cfg(test)]
 extern crate self as jalava;
 
-#[cfg(feature = "rocket")]
+#[cfg(feature = "rocket-compat")]
 pub use self::rocket::{ElmForm, ElmFormParts};
 pub use self::{elm::Elm, json::ElmJson};
 

@@ -133,8 +133,11 @@ prepareDrawing form =
 
 ### Cargo features
 - jalava-derive: Activated by default. Enables deriving the `Elm` and `ElmJson` (and `ElmForm` with rocket-compat) traits.
-- serde-compat: Enables compatibility with many of serde's attributes.
-- rocket-compat: Enables the `ElmForm` and `ElmFormParts` trait which allow easy integration with Rocket's forms.
+- serde-compat: Enables compatibility with many of serde's attributes. (`serde v1`)
+- rocket-compat: Enables the `ElmForm` and `ElmFormParts` trait which allow easy integration with Rocket's multipart forms. (`rocket v0.5-rc`)
+- chrono: Trait implementations for chrono types. (`chrono v0.4`)
+- time: Trait implementations for time types. (`time v0.2`)
+- uuid: Trait implementations for uuid types. (`uuid v0.8`)
 
 ### Serde compatibility
 The `serde-compat` feature enables compatibility with serde attributes. Currently the following attributes are supported:

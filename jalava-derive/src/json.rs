@@ -306,7 +306,8 @@ fn enum_external(
         let elm_name_serialize = variant.name_serialize();
         let elm_name_deserialize = variant.name_deserialize();
         if variant.other {
-            other_decoder = Some(quote! {::std::format!("Json.Decode.succeed {}", #elm_name_deserialize)});
+            other_decoder =
+                Some(quote! {::std::format!("Json.Decode.succeed {}", #elm_name_deserialize)});
         }
 
         let coder = match &variant.variant {

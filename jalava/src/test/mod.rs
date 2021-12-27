@@ -12,11 +12,10 @@ mod enums_external;
 mod enums_internal;
 mod enums_untagged;
 mod etc_serde;
+mod hygiene;
 mod structs;
 mod structs_serde;
 mod types;
-mod rocket;
-mod hygiene;
 
 fn test<T: Elm + ElmJson + Serialize + DeserializeOwned + PartialEq + Debug>(t: T) {
     let t_2 = test_without_eq(&t, "");
@@ -50,9 +49,6 @@ fn test_with_json<T: Elm + ElmJson + Serialize + DeserializeOwned + Debug>(
     let elm_type = T::elm_definition().unwrap();
     let encoder = T::encoder_definition().unwrap();
     let decoder = T::decoder_definition().unwrap();
-    println!("{}", elm_type);
-    println!("{}", encoder);
-    println!("{}", decoder);
 
     let mut cmd = Command::new("elm")
         .arg("repl")
