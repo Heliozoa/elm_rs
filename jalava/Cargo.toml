@@ -8,9 +8,9 @@ readme = "../README.md"
 resolver = "2"
 
 [features]
-default = ["jalava-derive"]
+default = ["jalava-derive", "jalava-derive/json"]
 rocket-compat = ["rocket", "jalava-derive/rocket"]
-serde-compat = ["jalava-derive/serde"]
+serde-compat = ["jalava-derive/json", "jalava-derive/serde"]
 
 [dependencies]
 jalava-derive = { path = "../jalava-derive", optional = true }

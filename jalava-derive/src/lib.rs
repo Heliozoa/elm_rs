@@ -2,6 +2,7 @@
 
 mod attributes;
 mod elm;
+#[cfg(feature = "json")]
 mod json;
 #[cfg(feature = "rocket")]
 mod rocket;
@@ -16,27 +17,27 @@ use syn::{
     Generics, Ident, Type, Variant,
 };
 
-/// Derive `Elm` for any type with fields that all implement `Elm`
-/// The big exception are tuples larger than 3, since 3-tuples are the largest that exist in Elm.
+/// Derive `Elm`.
 #[proc_macro_derive(Elm)]
 pub fn derive_elm(input: TokenStream) -> TokenStream {
     elm::derive_elm(input)
 }
 
-/// Derive `ElmJson` for any type other than empty enums or unions.
+/// Derive `ElmJson`.
+#[cfg(feature = "json")]
 #[proc_macro_derive(ElmJson)]
 pub fn derive_elm_json(input: TokenStream) -> TokenStream {
     json::derive_elm_json(input)
 }
 
-/// Derive `ElmForm` for any struct.
+/// Derive `ElmForm`.
 #[cfg(feature = "rocket")]
 #[proc_macro_derive(ElmForm)]
 pub fn derive_elm_form(input: TokenStream) -> TokenStream {
     rocket::derive_elm_form(input)
 }
 
-/// Derive `ElmFormParts` for any type other than empty enums, enums with variants that have fields, or unions.
+/// Derive `ElmFormParts`.
 #[cfg(feature = "rocket")]
 #[proc_macro_derive(ElmFormParts)]
 pub fn derive_elm_form_parts(input: TokenStream) -> TokenStream {
@@ -54,20 +55,14 @@ struct Intermediate {
 
 enum TypeInfo {
     // struct S;
-    // null
     Unit,
     // struct S(String);
-    // "string"
-    Newtype(Type),
+    Newtype(Box<Type>),
     // struct S(String, u32);
-    // []
-    // ["string", 0]
     Tuple(Vec<Type>),
     // struct S {
     //     s: String,
     // }
-    // {}
-    // {"s": "string"}
     Struct(Vec<StructField>),
     // enum E {
     //     Variant,
@@ -89,13 +84,13 @@ struct StructField {
 
 impl StructField {
     /// The name in the Elm type definition. Always camelCased for consistency with Elm style guidelines.
-    fn name_elm<'a>(&'a self) -> String {
+    fn name_elm(&self) -> String {
         self.ident.to_string().to_lower_camel_case()
     }
 
     /// The name when deserializing from JSON in Elm.
     /// The name when serializing to JSON in Rust.
-    fn name_deserialize<'a>(&'a self) -> Cow<'a, str> {
+    fn name_deserialize(&'_ self) -> Cow<'_, str> {
         match &self.rename_deserialize {
             Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
             Some(Rename::Field(rename)) => rename.into(),
@@ -109,7 +104,7 @@ impl StructField {
 
     /// The name when serializing to JSON in Elm.
     /// The name when deserializing from JSON in Rust.
-    fn name_serialize<'a>(&'a self) -> Cow<'a, str> {
+    fn name_serialize(&'_ self) -> Cow<'_, str> {
         match &self.rename_serialize {
             Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
             Some(Rename::Field(rename)) => rename.into(),
@@ -155,13 +150,13 @@ impl Default for EnumRepresentation {
 
 impl EnumVariant {
     /// The name in the Elm type definition. Always PascalCased for consistency with Elm style guidelines.
-    fn name_elm<'a>(&'a self) -> Cow<'a, str> {
+    fn name_elm(&'_ self) -> Cow<'_, str> {
         self.ident.to_string().to_pascal_case().into()
     }
 
     /// The name when deserializing from JSON in Elm.
     /// The name when serializing to JSON in Rust.
-    fn name_deserialize<'a>(&'a self) -> Cow<'a, str> {
+    fn name_deserialize(&'_ self) -> Cow<'_, str> {
         match &self.rename_deserialize {
             Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
             Some(Rename::Field(rename)) => rename.into(),
@@ -175,7 +170,7 @@ impl EnumVariant {
 
     /// The name when serializing to JSON in Elm.
     /// The name when deserializing from JSON in Rust.
-    fn name_serialize<'a>(&'a self) -> Cow<'a, str> {
+    fn name_serialize(&'_ self) -> Cow<'_, str> {
         match &self.rename_serialize {
             Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
             Some(Rename::Field(rename)) => rename.into(),
@@ -235,14 +230,14 @@ fn parse_type_info(
             Fields::Unit => TypeInfo::Unit,
             Fields::Unnamed(mut unnamed) => {
                 if unnamed.unnamed.len() == 1 {
-                    TypeInfo::Newtype(unnamed.unnamed.pop().unwrap().into_value().ty)
+                    TypeInfo::Newtype(Box::new(unnamed.unnamed.pop().unwrap().into_value().ty))
                 } else {
                     TypeInfo::Tuple(unnamed.unnamed.into_iter().map(|field| field.ty).collect())
                 }
             }
             Fields::Named(mut named) => {
                 if container_attributes.serde_transparent && named.named.len() == 1 {
-                    TypeInfo::Newtype(named.named.pop().unwrap().into_value().ty)
+                    TypeInfo::Newtype(Box::new(named.named.pop().unwrap().into_value().ty))
                 } else {
                     TypeInfo::Struct(fields_named_to_struct_fields(named, &container_attributes))
                 }
@@ -298,26 +293,34 @@ fn parse_enum_variant(
         rename: variant_attributes
             .serde_rename
             .map(Rename::Field)
-            .or(variant_attributes.serde_rename_all.map(Rename::Container))
-            .or(container_attributes.serde_rename_all.map(Rename::Container)),
+            .or_else(|| variant_attributes.serde_rename_all.map(Rename::Container))
+            .or_else(|| container_attributes.serde_rename_all.map(Rename::Container)),
         rename_deserialize: variant_attributes
             .serde_rename_serialize
             .map(Rename::Field)
-            .or(variant_attributes
-                .serde_rename_all_serialize
-                .map(Rename::Container))
-            .or(container_attributes
-                .serde_rename_all_serialize
-                .map(Rename::Container)),
+            .or_else(|| {
+                variant_attributes
+                    .serde_rename_all_serialize
+                    .map(Rename::Container)
+            })
+            .or_else(|| {
+                container_attributes
+                    .serde_rename_all_serialize
+                    .map(Rename::Container)
+            }),
         rename_serialize: variant_attributes
             .serde_rename_deserialize
             .map(Rename::Field)
-            .or(variant_attributes
-                .serde_rename_all_deserialize
-                .map(Rename::Container))
-            .or(container_attributes
-                .serde_rename_all_deserialize
-                .map(Rename::Container)),
+            .or_else(|| {
+                variant_attributes
+                    .serde_rename_all_deserialize
+                    .map(Rename::Container)
+            })
+            .or_else(|| {
+                container_attributes
+                    .serde_rename_all_deserialize
+                    .map(Rename::Container)
+            }),
         skip: variant_attributes.serde_skip,
         other: variant_attributes.serde_other,
         variant: variant_kind,
@@ -343,19 +346,23 @@ fn fields_named_to_struct_fields(
             rename: field_attributes
                 .serde_rename
                 .map(Rename::Field)
-                .or(container_attributes.serde_rename_all.map(Rename::Container)),
+                .or_else(|| container_attributes.serde_rename_all.map(Rename::Container)),
             rename_deserialize: field_attributes
                 .serde_rename_serialize
                 .map(Rename::Field)
-                .or(container_attributes
-                    .serde_rename_all_serialize
-                    .map(Rename::Container)),
+                .or_else(|| {
+                    container_attributes
+                        .serde_rename_all_serialize
+                        .map(Rename::Container)
+                }),
             rename_serialize: field_attributes
                 .serde_rename_deserialize
                 .map(Rename::Field)
-                .or(container_attributes
-                    .serde_rename_all_deserialize
-                    .map(Rename::Container)),
+                .or_else(|| {
+                    container_attributes
+                        .serde_rename_all_deserialize
+                        .map(Rename::Container)
+                }),
             aliases: field_attributes.serde_aliases,
             ty: field.ty,
         })

@@ -11,9 +11,9 @@ resolver = "2"
 proc-macro = true
 
 [features]
-default = ["serde"]
 serde = []
 rocket = []
+json = []
 
 [dependencies]
 heck = "0.4"

@@ -318,7 +318,7 @@ fn enum_external(
                 &elm_name,
                 &elm_name_serialize,
                 &elm_name_deserialize,
-                &inner,
+                inner,
             ),
             EnumVariantKind::Tuple(types) => enum_variant_tuple_external(
                 &elm_name,
@@ -572,7 +572,7 @@ _ ->
                 &elm_name,
                 &elm_name_serialize,
                 &elm_name_deserialize,
-                &types,
+                types,
             ),
             EnumVariantKind::Struct(fields) => {
                 let (coder, constructor) = enum_variant_struct_adjacent(
@@ -581,7 +581,7 @@ _ ->
                     &elm_name,
                     &elm_name_serialize,
                     &elm_name_deserialize,
-                    &fields,
+                    fields,
                 );
                 constructors.push(constructor);
                 coder

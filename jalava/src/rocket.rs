@@ -58,7 +58,7 @@ impl<T: ElmFormParts> ElmFormParts for Vec<T> {
                 &var,
                 recursion + 1
             ),
-            T::to_string().unwrap_or("identity".to_string()),
+            T::to_string().unwrap_or_else(|| "identity".to_string()),
             path
         )
     }

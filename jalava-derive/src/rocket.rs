@@ -3,7 +3,7 @@
 use crate::{EnumVariantKind, Intermediate, StructField, TypeInfo};
 use heck::ToLowerCamelCase;
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Ident};
 
@@ -26,7 +26,10 @@ pub fn derive_elm_form_parts(input: TokenStream) -> TokenStream {
         Ok(intermediate) => intermediate,
         Err(err) => return err.to_compile_error().into(),
     };
-    let token_stream = intermediate_to_fields(intermediate);
+    let token_stream = match intermediate_to_fields(intermediate) {
+        Ok(token_stream) => token_stream,
+        Err(err) => return err.to_compile_error().into(),
+    };
     TokenStream::from(token_stream)
 }
 
@@ -39,7 +42,7 @@ fn intermediate_to_form(
         type_info,
     }: Intermediate,
 ) -> Result<TokenStream2, syn::Error> {
-    let form_parts = make_form_parts(&ident, &type_info);
+    let form_parts = make_form_parts(&ident, &type_info)?;
     let fields = if let TypeInfo::Struct(fields) = type_info {
         fields
     } else {
@@ -68,14 +71,15 @@ fn intermediate_to_fields(
         type_info: kind,
         ..
     }: Intermediate,
-) -> TokenStream2 {
-    let form_parts = make_form_parts(&ident, &kind);
+) -> Result<TokenStream2, syn::Error> {
+    let form_parts = make_form_parts(&ident, &kind)?;
 
-    quote! {
+    let res = quote! {
         impl #generics ::jalava::ElmFormParts for #ident #generics {
             #form_parts
         }
-    }
+    };
+    Ok(res)
 }
 
 fn make_prepare_form(form_type_name: &str, fields: &[StructField]) -> TokenStream2 {
@@ -99,12 +103,12 @@ prepare{0} form =
     }
 }
 
-fn make_form_parts(id: &Ident, kind: &TypeInfo) -> TokenStream2 {
+fn make_form_parts(id: &Ident, kind: &TypeInfo) -> Result<TokenStream2, syn::Error> {
     match kind {
         TypeInfo::Struct(fields) => {
             let ids = fields.iter().map(|field| &field.ident);
             let tys = fields.iter().map(|field| &field.ty);
-            quote! {
+            let res = quote! {
                 fn form_parts_inner(field: &::std::primitive::str, path: &::std::primitive::str, recursion: ::std::primitive::u32) -> ::std::string::String {
                     ::std::format!("{}",
                         [#(::std::format!("{}", <#tys as ::jalava::ElmFormParts>::form_parts_inner(
@@ -114,16 +118,20 @@ fn make_form_parts(id: &Ident, kind: &TypeInfo) -> TokenStream2 {
                         ))),*
                         ].join("\n            , "))
                 }
-            }
+            };
+            Ok(res)
         }
         TypeInfo::Enum { variants, .. } => {
             let names = variants
                 .iter()
                 .map(|variant| match variant.variant {
-                    EnumVariantKind::Unit { .. } => &variant.ident,
-                    _ => panic!("only unit variants are supported"),
+                    EnumVariantKind::Unit { .. } => Ok(&variant.ident),
+                    _ => Err(syn::Error::new(
+                        Span::call_site(),
+                        "only unit variants are supported",
+                    )),
                 })
-                .collect::<Vec<_>>();
+                .collect::<Result<Vec<_>, _>>()?;
 
             let id = id.to_string();
             let to_string = format!("{}ToString", id.to_lower_camel_case());
@@ -138,7 +146,7 @@ fn make_form_parts(id: &Ident, kind: &TypeInfo) -> TokenStream2 {
                 #id,
                 [#(::std::format!("{0} -> \"{0}\"", ::std::stringify!(#names))),*].join("\n\n        ")
             )};
-            quote! {
+            let res = quote! {
                 fn form_parts_inner(field: &::std::primitive::str, path: &::std::primitive::str, _recursion: ::std::primitive::u32) -> ::std::string::String {
                     ::std::format!("[ Http.stringPart \"{}\" ({} {}) ]", field, #to_string, path)
                 }
@@ -150,10 +158,12 @@ fn make_form_parts(id: &Ident, kind: &TypeInfo) -> TokenStream2 {
                 fn to_string_definition() -> ::std::option::Option<::std::string::String> {
                     ::std::option::Option::Some(::std::string::ToString::to_string(&#to_string_definition))
                 }
-            }
+            };
+            Ok(res)
         }
-        _ => {
-            panic!("only structs and enums are supported")
-        }
+        _ => Err(syn::Error::new(
+            Span::call_site(),
+            "only structs and enums are supported",
+        )),
     }
 }

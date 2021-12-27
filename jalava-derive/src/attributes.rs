@@ -45,14 +45,14 @@ impl RenameAll {
 
     pub fn rename_ident(self, ident: &Ident) -> String {
         match self {
-            RenameAll::Lowercase => ident.to_string().to_lowercase().into(),
-            RenameAll::Uppercase => ident.to_string().to_uppercase().into(),
-            RenameAll::PascalCase => ident.to_string().to_pascal_case().into(),
-            RenameAll::CamelCase => ident.to_string().to_lower_camel_case().into(),
-            RenameAll::SnakeCase => ident.to_string().to_snake_case().into(),
-            RenameAll::ScreamingSnakeCase => ident.to_string().to_shouty_snake_case().into(),
-            RenameAll::KebabCase => ident.to_string().to_kebab_case().into(),
-            RenameAll::ScreamingKebabCase => ident.to_string().to_shouty_kebab_case().into(),
+            RenameAll::Lowercase => ident.to_string().to_lowercase(),
+            RenameAll::Uppercase => ident.to_string().to_uppercase(),
+            RenameAll::PascalCase => ident.to_string().to_pascal_case(),
+            RenameAll::CamelCase => ident.to_string().to_lower_camel_case(),
+            RenameAll::SnakeCase => ident.to_string().to_snake_case(),
+            RenameAll::ScreamingSnakeCase => ident.to_string().to_shouty_snake_case(),
+            RenameAll::KebabCase => ident.to_string().to_kebab_case(),
+            RenameAll::ScreamingKebabCase => ident.to_string().to_shouty_kebab_case(),
         }
     }
 }
