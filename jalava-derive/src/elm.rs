@@ -40,7 +40,7 @@ fn intermediate_to_token_stream(
     quote! {
         impl #generics ::jalava::Elm for #ident #generics_without_bounds {
             fn elm_type() -> ::std::string::String {
-                ::std::string::String::from(#elm_type)
+                ::std::convert::From::from(#elm_type)
             }
 
             fn elm_definition() -> ::std::option::Option<::std::string::String> {
@@ -51,7 +51,7 @@ fn intermediate_to_token_stream(
 }
 
 fn unit(elm_type: &str) -> TokenStream2 {
-    quote! {format!("\
+    quote! {::std::format!("\
 type {elm_type}
     = {elm_type}
 ",
@@ -60,7 +60,7 @@ type {elm_type}
 }
 
 fn newtype(elm_type: &str, ty: &Type) -> TokenStream2 {
-    quote! {format!("\
+    quote! {::std::format!("\
 type {elm_type}
     = {elm_type} ({inner_type})
 ",
@@ -70,7 +70,7 @@ type {elm_type}
 }
 
 fn tuple(elm_type: &str, ts: &[Type]) -> TokenStream2 {
-    quote! {format!("\
+    quote! {::std::format!("\
 type {elm_type}
     = {elm_type} {types}
 ",
@@ -78,8 +78,8 @@ type {elm_type}
         types =
             (
                 &[
-                    #(format!("({})", <#ts as ::jalava::Elm>::elm_type())),*
-                ] as &[String]
+                    #(::std::format!("({})", <#ts as ::jalava::Elm>::elm_type())),*
+                ]
             ).join(" "),
     )}
 }
@@ -87,7 +87,7 @@ type {elm_type}
 fn struct_type(elm_type: &str, fields: Vec<StructField>) -> TokenStream2 {
     let ids = fields.iter().map(|field| field.name_elm());
     let tys = fields.iter().map(|field| &field.ty);
-    quote! {format!("\
+    quote! {::std::format!("\
 type alias {elm_type} =
     {{ {fields}
     }}
@@ -96,8 +96,8 @@ type alias {elm_type} =
         fields =
             (
                 &[
-                    #(format!("{} : {}", #ids, <#tys as ::jalava::Elm>::elm_type())),*
-                ] as &[::std::string::String]
+                    #(::std::format!("{} : {}", #ids, <#tys as ::jalava::Elm>::elm_type())),*
+                ]
             ).join("\n    , "),
     )}
 }
@@ -115,18 +115,18 @@ fn enum_type(elm_type: &str, enum_variants: Vec<EnumVariant>) -> TokenStream2 {
             }
             EnumVariantKind::Newtype(ty) => {
                 let field = quote! {
-                    format!("{} ({})", #variant_elm_name, <#ty as ::jalava::Elm>::elm_type())
+                    ::std::format!("{} ({})", #variant_elm_name, <#ty as ::jalava::Elm>::elm_type())
                 };
                 enum_fields.push(field);
             }
             EnumVariantKind::Tuple(tys) => {
                 let field = quote! {
-                    format!("{name} {types}",
+                    ::std::format!("{name} {types}",
                         name = #variant_elm_name,
                         types =
                             (
                                 &[
-                                    #(format!("({})", <#tys as ::jalava::Elm>::elm_type())),*
+                                    #(::std::format!("({})", <#tys as ::jalava::Elm>::elm_type())),*
                                 ] as &[::std::string::String]
                             ).join(" "))
                 };
@@ -136,12 +136,12 @@ fn enum_type(elm_type: &str, enum_variants: Vec<EnumVariant>) -> TokenStream2 {
                 let ids = fields.iter().map(|field| field.name_elm());
                 let tys = fields.iter().map(|field| &field.ty);
                 let field = quote! {
-                    format!("{name} {{ {fields} }}",
+                    ::std::format!("{name} {{ {fields} }}",
                     name = #variant_elm_name,
                     fields =
                         (
                             &[
-                                #(format!("{} : {}", #ids, <#tys as ::jalava::Elm>::elm_type())),*
+                                #(::std::format!("{} : {}", #ids, <#tys as ::jalava::Elm>::elm_type())),*
                             ] as &[::std::string::String]
                         ).join(", "))
                 };
@@ -149,7 +149,7 @@ fn enum_type(elm_type: &str, enum_variants: Vec<EnumVariant>) -> TokenStream2 {
             }
         }
     }
-    quote! {format!("\
+    quote! {::std::format!("\
 type {elm_type}
     = {enum_fields}
 ", 
@@ -157,7 +157,7 @@ type {elm_type}
         enum_fields =
             (
                 &[
-                    #(format!("{}", #enum_fields)),*
+                    #(::std::format!("{}", #enum_fields)),*
                 ] as &[::std::string::String]
             ).join("\n    | "),
     )}

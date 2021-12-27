@@ -1,5 +1,6 @@
 //! Contains the rocket-compatible `ElmForm` trait.
 
+#[cfg(feature = "jalava-derive")]
 pub use jalava_derive::{ElmForm, ElmFormParts};
 use rocket::fs::TempFile;
 
@@ -14,7 +15,7 @@ pub trait ElmForm {
 /// Used to for types that can be fields in a multipart request to a Rocket server.
 pub trait ElmFormParts {
     fn form_parts(field: &str) -> String {
-        Self::form_parts_inner(field, &format!("form.{}", field), 0)
+        Self::form_parts_inner(field, &::std::format!("form.{}", field), 0)
     }
 
     fn form_parts_inner(field: &str, path: &str, recursion: u32) -> String;
@@ -40,7 +41,7 @@ impl Elm for TempFile<'_> {
 
 impl ElmFormParts for TempFile<'_> {
     fn form_parts_inner(field: &str, path: &str, _recursion: u32) -> String {
-        format!(r#"[ Http.filePart ("{}") {} ]"#, field, path)
+        ::std::format!(r#"[ Http.filePart ("{}") {} ]"#, field, path)
     }
 }
 
@@ -48,12 +49,12 @@ impl<T: ElmFormParts> ElmFormParts for Vec<T> {
     fn form_parts_inner(field: &str, path: &str, recursion: u32) -> String {
         let idx = format!("i{}", recursion);
         let var = format!("x{}", recursion);
-        format!(
-            r#"List.concat (List.concat (List.indexedMap (\{} {} -> [{}]) ({} {})))"#,
+        ::std::format!(
+            r#"List.concat (List.concat (List.indexedMap (\{} {} -> [ {} ]) ({} {})))"#,
             idx,
             var,
             T::form_parts_inner(
-                &format!("{}[\" ++ String.fromInt {} ++ \"]", field, idx),
+                &::std::format!("{}[\" ++ String.fromInt {} ++ \"]", field, idx),
                 &var,
                 recursion + 1
             ),
@@ -67,7 +68,7 @@ macro_rules! impl_stringpart {
     ($ty: ty, $to_string: expr) => {
         impl ElmFormParts for $ty {
             fn form_parts_inner(field: &str, path: &str, _recursion: u32) -> String {
-                format!(
+                ::std::format!(
                     r#"[ Http.stringPart ("{}") ({} {}) ]"#,
                     field, $to_string, path
                 )
@@ -122,12 +123,12 @@ macro_rules! impl_dict {
             fn form_parts_inner(field: &str, path: &str, recursion: u32) -> String {
                 let key = format!("k{}", recursion);
                 let val = format!("v{}", recursion);
-                format!(
+                ::std::format!(
                     r#"List.concat (List.map (\( {}, {} ) -> ({})) (Dict.toList {}))"#,
                     key,
                     val,
                     T::form_parts_inner(
-                        &format!("{}[\" ++ {} ++ \"]", field, key),
+                        &::std::format!("{}[\" ++ {} ++ \"]", field, key),
                         &val,
                         recursion + 1
                     ),
@@ -158,6 +159,6 @@ impl_dict!(f64);
 #[cfg(feature = "chrono")]
 impl<T: chrono::TimeZone> ElmFormParts for chrono::DateTime<T> {
     fn form_parts_inner(field: &str, path: &str, _recursion: u32) -> String {
-        format!(r#"[ Http.stringPart ("{}") {} ]"#, field, path)
+        ::std::format!(r#"[ Http.stringPart ("{}") {} ]"#, field, path)
     }
 }

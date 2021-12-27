@@ -48,13 +48,13 @@ fn intermediate_to_form(
     let prepare_form = make_prepare_form(&elm_type, &fields);
 
     let block = quote! {
-        impl #generics jalava::ElmForm for #ident #generics_without_bounds {
-            fn prepare_form() -> String {
+        impl #generics ::jalava::ElmForm for #ident #generics_without_bounds {
+            fn prepare_form() -> ::std::string::String {
                 #prepare_form
             }
         }
 
-        impl #generics jalava::ElmFormParts for #ident #generics_without_bounds {
+        impl #generics ::jalava::ElmFormParts for #ident #generics_without_bounds {
             #form_parts
         }
     };
@@ -72,7 +72,7 @@ fn intermediate_to_fields(
     let form_parts = make_form_parts(&ident, &kind);
 
     quote! {
-        impl #generics jalava::ElmFormParts for #ident #generics {
+        impl #generics ::jalava::ElmFormParts for #ident #generics {
             #form_parts
         }
     }
@@ -83,9 +83,8 @@ fn make_prepare_form(form_type_name: &str, fields: &[StructField]) -> TokenStrea
     let field_types = fields.iter().map(|field| &field.ty);
 
     quote! {
-        use jalava::ElmFormParts;
-        let form_fields =  [#(<#field_types>::form_parts(stringify!(#field_names))),*];
-        format!(
+        let form_fields =  [#(<#field_types as ::jalava::ElmFormParts>::form_parts(::std::stringify!(#field_names))),*];
+        ::std::format!(
                 "prepare{0} : {0} -> Http.Body
 prepare{0} form =
     Http.multipartBody <|
@@ -106,11 +105,11 @@ fn make_form_parts(id: &Ident, kind: &TypeInfo) -> TokenStream2 {
             let ids = fields.iter().map(|field| &field.ident);
             let tys = fields.iter().map(|field| &field.ty);
             quote! {
-                fn form_parts_inner(field: &str, path: &str, recursion: u32) -> String {
-                    format!("{}",
-                        [#(format!("{}", <#tys>::form_parts_inner(
-                            &format!("{}.{}", field, stringify!(#ids)),
-                            &format!("{}.{}", path, stringify!(#ids)),
+                fn form_parts_inner(field: &::std::primitive::str, path: &::std::primitive::str, recursion: ::std::primitive::u32) -> ::std::string::String {
+                    ::std::format!("{}",
+                        [#(::std::format!("{}", <#tys as ::jalava::ElmFormParts>::form_parts_inner(
+                            &::std::format!("{}.{}", field, ::std::stringify!(#ids)),
+                            &::std::format!("{}.{}", path, ::std::stringify!(#ids)),
                             recursion + 1
                         ))),*
                         ].join("\n            , "))
@@ -128,7 +127,7 @@ fn make_form_parts(id: &Ident, kind: &TypeInfo) -> TokenStream2 {
 
             let id = id.to_string();
             let to_string = format!("{}ToString", id.to_lower_camel_case());
-            let to_string_definition = quote! {format!(
+            let to_string_definition = quote! {::std::format!(
                 "\
 {0} : {1} -> String
 {0} enum =
@@ -137,19 +136,19 @@ fn make_form_parts(id: &Ident, kind: &TypeInfo) -> TokenStream2 {
 ",
                 #to_string,
                 #id,
-                [#(format!("{0} -> \"{0}\"", stringify!(#names))),*].join("\n\n        ")
+                [#(::std::format!("{0} -> \"{0}\"", ::std::stringify!(#names))),*].join("\n\n        ")
             )};
             quote! {
-                fn form_parts_inner(field: &str, path: &str, _recursion: u32) -> String {
-                    format!("[ Http.stringPart \"{}\" ({} {}) ]", field, #to_string, path)
+                fn form_parts_inner(field: &::std::primitive::str, path: &::std::primitive::str, _recursion: ::std::primitive::u32) -> ::std::string::String {
+                    ::std::format!("[ Http.stringPart \"{}\" ({} {}) ]", field, #to_string, path)
                 }
 
-                fn to_string() -> Option<String> {
-                    Some(#to_string.to_string())
+                fn to_string() -> ::std::option::Option<::std::string::String> {
+                    ::std::option::Option::Some(::std::string::ToString::to_string(&#to_string))
                 }
 
-                fn to_string_definition() -> Option<String> {
-                    Some(#to_string_definition.to_string())
+                fn to_string_definition() -> ::std::option::Option<::std::string::String> {
+                    ::std::option::Option::Some(::std::string::ToString::to_string(&#to_string_definition))
                 }
             }
         }

@@ -15,6 +15,8 @@ mod etc_serde;
 mod structs;
 mod structs_serde;
 mod types;
+mod rocket;
+mod hygiene;
 
 fn test<T: Elm + ElmJson + Serialize + DeserializeOwned + PartialEq + Debug>(t: T) {
     let t_2 = test_without_eq(&t, "");

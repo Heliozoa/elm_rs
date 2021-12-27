@@ -1,5 +1,6 @@
 //! Contains the `Elm` trait.
 
+#[cfg(feature = "jalava-derive")]
 pub use jalava_derive::Elm;
 
 /// Used to represent Rust types in Elm.
@@ -29,7 +30,7 @@ where
     U: Elm,
 {
     fn elm_type() -> String {
-        format!("( {}, {} )", T::elm_type(), U::elm_type())
+        ::std::format!("( {}, {} )", T::elm_type(), U::elm_type())
     }
 
     fn elm_definition() -> Option<String> {
@@ -44,7 +45,7 @@ where
     V: Elm,
 {
     fn elm_type() -> String {
-        format!(
+        ::std::format!(
             "( {}, {}, {} )",
             T::elm_type(),
             U::elm_type(),
@@ -100,7 +101,7 @@ type alias Duration =
 
 impl<T: Elm, E: Elm> Elm for Result<T, E> {
     fn elm_type() -> String {
-        format!("Result {} {}", T::elm_type(), E::elm_type())
+        ::std::format!("Result {} {}", T::elm_type(), E::elm_type())
     }
 
     fn elm_definition() -> Option<String> {
@@ -144,7 +145,7 @@ macro_rules! impl_builtin_container {
     ($rust_type: ty, $elm_name: expr, $elm_decoder: expr, $elm_encoder: expr) => {
         impl<T: Elm> Elm for $rust_type {
             fn elm_type() -> String {
-                format!("{} ({})", $elm_name, T::elm_type())
+                ::std::format!("{} ({})", $elm_name, T::elm_type())
             }
 
             fn elm_definition() -> Option<String> {
@@ -158,7 +159,7 @@ macro_rules! impl_builtin_map {
     ($rust_type: ty) => {
         impl<T: Elm> Elm for $rust_type {
             fn elm_type() -> String {
-                format!("Dict String ({})", T::elm_type())
+                ::std::format!("Dict String ({})", T::elm_type())
             }
 
             fn elm_definition() -> Option<String> {
@@ -172,7 +173,7 @@ macro_rules! impl_builtin_ptr {
     ($rust_type: ty) => {
         impl<T: Elm + ?Sized> Elm for $rust_type {
             fn elm_type() -> String {
-                format!("{}", T::elm_type())
+                ::std::format!("{}", T::elm_type())
             }
 
             fn elm_definition() -> Option<String> {

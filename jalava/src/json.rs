@@ -1,6 +1,8 @@
 //! Contains the `ElmJson` trait.
 
 use crate::Elm;
+
+#[cfg(feature = "jalava-derive")]
 pub use jalava_derive::ElmJson;
 
 /// Used to generate JSON encoders and decoders for our Rust types in Elm.
@@ -20,7 +22,7 @@ where
     T: Elm + ElmJson,
 {
     fn decoder_type() -> String {
-        format!("(Json.Decode.index 0 ({}))", T::decoder_type(),)
+        ::std::format!("(Json.Decode.index 0 ({}))", T::decoder_type(),)
     }
 
     fn decoder_definition() -> Option<String> {
@@ -28,7 +30,7 @@ where
     }
 
     fn encoder_type() -> String {
-        format!(
+        ::std::format!(
             "\\( a ) -> Json.Encode.list identity [ {} a ]",
             T::encoder_type(),
         )
@@ -45,7 +47,7 @@ where
     U: Elm + ElmJson,
 {
     fn decoder_type() -> String {
-        format!(
+        ::std::format!(
             "Json.Decode.map2 (\\a b -> ( a, b )) (Json.Decode.index 0 ({})) (Json.Decode.index 1 ({}))",
             T::decoder_type(),
             U::decoder_type()
@@ -57,7 +59,7 @@ where
     }
 
     fn encoder_type() -> String {
-        format!(
+        ::std::format!(
             "\\( a, b) -> Json.Encode.list identity [ {} a, {} b ]",
             T::encoder_type(),
             U::encoder_type(),
@@ -76,7 +78,7 @@ where
     V: Elm + ElmJson,
 {
     fn decoder_type() -> String {
-        format!(
+        ::std::format!(
             "Json.Decode.map3 (\\a b c -> ( a, b, c )) (Json.Decode.index 0 ({})) (Json.Decode.index 1 ({})) (Json.Decode.index 2 ({}))",
             T::decoder_type(),
             U::decoder_type(),
@@ -89,7 +91,7 @@ where
     }
 
     fn encoder_type() -> String {
-        format!(
+        ::std::format!(
             "\\( a, b, c ) -> Json.Encode.list identity [ {} a, {} b, {} c ]",
             T::encoder_type(),
             U::encoder_type(),
@@ -182,7 +184,7 @@ impl<T: Elm + ElmJson, E: Elm + ElmJson> ElmJson for Result<T, E> {
     }
 
     fn decoder_definition() -> Option<String> {
-        Some(format!(
+        Some(::std::format!(
             r#"resultDecoder : Json.Decode.Decoder (Result {} {})
 resultDecoder =
     Json.Decode.oneOf
@@ -201,7 +203,7 @@ resultDecoder =
     }
 
     fn encoder_definition() -> Option<String> {
-        Some(format!(
+        Some(::std::format!(
             r#"resultEncoder : (Result {} {}) -> Json.Encode.Value
 resultEncoder enum =
     case enum of
@@ -278,7 +280,7 @@ macro_rules! impl_builtin_container {
     ($rust_type: ty, $elm_name: expr, $elm_decoder: expr, $elm_encoder: expr) => {
         impl<T: Elm + ElmJson> ElmJson for $rust_type {
             fn decoder_type() -> String {
-                format!("{} ({})", $elm_decoder, T::decoder_type())
+                ::std::format!("{} ({})", $elm_decoder, T::decoder_type())
             }
 
             fn decoder_definition() -> Option<String> {
@@ -286,7 +288,7 @@ macro_rules! impl_builtin_container {
             }
 
             fn encoder_type() -> String {
-                format!("{} ({})", $elm_encoder, T::encoder_type())
+                ::std::format!("{} ({})", $elm_encoder, T::encoder_type())
             }
 
             fn encoder_definition() -> Option<String> {
@@ -300,7 +302,7 @@ macro_rules! impl_builtin_map {
     ($rust_type: ty) => {
         impl<T: Elm + ElmJson> ElmJson for $rust_type {
             fn decoder_type() -> String {
-                format!("Json.Decode.dict ({})", T::decoder_type())
+                ::std::format!("Json.Decode.dict ({})", T::decoder_type())
             }
 
             fn decoder_definition() -> Option<String> {
@@ -308,7 +310,7 @@ macro_rules! impl_builtin_map {
             }
 
             fn encoder_type() -> String {
-                format!("Json.Encode.dict identity ({})", T::encoder_type())
+                ::std::format!("Json.Encode.dict identity ({})", T::encoder_type())
             }
 
             fn encoder_definition() -> Option<String> {
@@ -322,7 +324,7 @@ macro_rules! impl_builtin_ptr {
     ($rust_type: ty) => {
         impl<T: Elm + ElmJson + ?Sized> ElmJson for $rust_type {
             fn decoder_type() -> String {
-                format!("{}", T::decoder_type())
+                ::std::format!("{}", T::decoder_type())
             }
 
             fn decoder_definition() -> Option<String> {
@@ -330,7 +332,7 @@ macro_rules! impl_builtin_ptr {
             }
 
             fn encoder_type() -> String {
-                format!("{}", T::encoder_type())
+                ::std::format!("{}", T::encoder_type())
             }
 
             fn encoder_definition() -> Option<String> {

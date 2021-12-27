@@ -17,35 +17,10 @@ struct Drawing {
 }
 
 fn main() {
-    let elm_types = format!(
-        "
-{}
-
-{}
-
-{}
-
-{}
-
-{}
-
-{}
-
-{}
-
-{}",
-        Filetype::elm_definition().unwrap(),
-        Filetype::decoder_definition().unwrap(),
-        Filetype::encoder_definition().unwrap(),
-        Filetype::to_string_definition().unwrap(),
-        Drawing::elm_definition().unwrap(),
-        Drawing::decoder_definition().unwrap(),
-        Drawing::encoder_definition().unwrap(),
-        Drawing::prepare_form(),
-    );
-    println!("{}", elm_types);
+    // the target would typically be a file
+    let mut target = vec![];
+    // jalava provides a macro for conveniently creating an Elm module with everything needed
+    jalava::export!("Bindings", &mut target, Drawing, Filetype; Drawing).unwrap();
+    let output = String::from_utf8(target).unwrap();
+    println!("{}", output);
 }
-
-#[derive(Elm, serde::Serialize)]
-#[serde(rename(serialize = ""))]
-struct Asd;

@@ -140,7 +140,7 @@ fn types() {
             i64: 0,
             isize: 0,
         },
-        &format!(
+        &::std::format!(
             "\
 {}
 

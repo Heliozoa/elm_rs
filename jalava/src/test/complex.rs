@@ -46,7 +46,7 @@ fn complex() {
                 E::Named { u8: 0 },
             ])],
         },
-        &format!(
+        &::std::format!(
             "\
 {}
 
