@@ -9,8 +9,8 @@ resolver = "2"
 
 [features]
 default = ["jalava-derive", "jalava-derive/json"]
-rocket-compat = ["rocket", "jalava-derive/rocket"]
-serde-compat = ["jalava-derive/json", "jalava-derive/serde"]
+with-rocket = ["rocket", "jalava-derive/rocket"]
+with-serde = ["jalava-derive/json", "jalava-derive/serde"]
 
 [dependencies]
 jalava-derive = { path = "../jalava-derive", optional = true }
