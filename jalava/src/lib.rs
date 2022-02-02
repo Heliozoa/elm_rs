@@ -51,15 +51,6 @@ import Json.Decode
 import Json.Encode
 
 
-boolToString : Bool -> String
-boolToString b =
-    case b of
-        True ->
-            \"True\"
-
-        False ->
-            \"False\"
-
 ", name)?;
                 $(
                     if let ::std::option::Option::Some(elm_definition) = <$json as $crate::Elm>::elm_definition() {

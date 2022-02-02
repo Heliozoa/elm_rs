@@ -38,20 +38,8 @@ prints out
 module Bindings exposing (..)
 
 import Dict exposing (Dict)
-import File
-import Http
 import Json.Decode
 import Json.Encode
-
-
-boolToString : Bool -> String
-boolToString b =
-    case b of
-        True ->
-            "True"
-
-        False ->
-            "False"
 
 
 type alias Drawing =
@@ -150,6 +138,8 @@ The `with-serde` feature enables compatibility with serde attributes. Currently 
 - [x] Compatibility with most serde attributes
 
 ### Planned
+- [ ] Support for forms
+- [ ] Support for queries
 - [ ] Compatibility with more serde attributes
   - [ ] flatten
   - [ ] alias
