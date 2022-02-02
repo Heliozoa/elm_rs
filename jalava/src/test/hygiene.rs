@@ -1,13 +1,13 @@
 #![no_implicit_prelude]
 #![allow(dead_code)]
 
-#[derive(crate::jalava::Elm, crate::jalava::ElmJson, crate::jalava::ElmFormParts)]
+#[derive(crate::jalava::Elm, crate::jalava::ElmJson)]
 enum Filetype {
     Jpeg,
     Png,
 }
 
-#[derive(crate::jalava::Elm, crate::jalava::ElmJson, crate::jalava::ElmForm)]
+#[derive(crate::jalava::Elm, crate::jalava::ElmJson)]
 struct Drawing {
     filename: ::std::string::String,
     filetype: Filetype,
@@ -16,5 +16,5 @@ struct Drawing {
 #[test]
 fn hygiene() {
     let mut target = ::std::vec![];
-    crate::jalava::export!("Bindings", &mut target, Drawing, Filetype; Drawing).unwrap();
+    crate::jalava::export!("Bindings", &mut target, Drawing, Filetype).unwrap();
 }

@@ -4,8 +4,6 @@ mod attributes;
 mod elm;
 #[cfg(feature = "json")]
 mod json;
-#[cfg(feature = "rocket")]
-mod rocket;
 
 use self::attributes::*;
 use heck::{ToLowerCamelCase, ToPascalCase};
@@ -28,20 +26,6 @@ pub fn derive_elm(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(ElmJson)]
 pub fn derive_elm_json(input: TokenStream) -> TokenStream {
     json::derive_elm_json(input)
-}
-
-/// Derive `ElmForm`.
-#[cfg(feature = "rocket")]
-#[proc_macro_derive(ElmForm)]
-pub fn derive_elm_form(input: TokenStream) -> TokenStream {
-    rocket::derive_elm_form(input)
-}
-
-/// Derive `ElmFormParts`.
-#[cfg(feature = "rocket")]
-#[proc_macro_derive(ElmFormParts)]
-pub fn derive_elm_form_parts(input: TokenStream) -> TokenStream {
-    rocket::derive_elm_form_parts(input)
 }
 
 /// Intermediate representation of the derive input for more convenient handling.

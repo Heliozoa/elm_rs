@@ -10,6 +10,3 @@ The tests use optional dependencies, so `--all-features` is needed. At the momen
 ```console
 cargo test --all-features -- --test-threads 1
 ```
-```console
-cargo test rocket --all-features -- --ignored --nocapture
-```

@@ -12,7 +12,6 @@ proc-macro = true
 
 [features]
 serde = []
-rocket = []
 json = []
 
 [dependencies]

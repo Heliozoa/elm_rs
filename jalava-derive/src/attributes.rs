@@ -89,8 +89,6 @@ pub(crate) fn parse_container_attributes(attrs: &[Attribute]) -> ContainerAttrib
             } else if meta_list.path.is_ident("serde") {
                 #[cfg(feature = "serde")]
                 serde::parse_container_attributes(&mut attributes, meta_list);
-            } else if meta_list.path.is_ident("rocket") {
-                // todo
             }
         }
     }
@@ -107,8 +105,6 @@ pub(crate) fn parse_variant_attributes(attrs: &[Attribute]) -> VariantAttributes
             } else if meta_list.path.is_ident("serde") {
                 #[cfg(feature = "serde")]
                 serde::parse_variant_attributes(&mut attributes, meta_list);
-            } else if meta_list.path.is_ident("rocket") {
-                // todo
             }
         }
     }
@@ -125,8 +121,6 @@ pub(crate) fn parse_field_attributes(attrs: &[Attribute]) -> FieldAttributes {
             } else if meta_list.path.is_ident("serde") {
                 #[cfg(feature = "serde")]
                 serde::parse_field_attributes(&mut attributes, meta_list);
-            } else if meta_list.path.is_ident("rocket") {
-                // todo
             }
         }
     }

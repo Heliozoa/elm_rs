@@ -1,1 +1,1 @@
-Derive macros for `jalava::{Elm, ElmJson, ElmForm, ElmFormParts}`.
+Derive macros for `jalava::{Elm, ElmJson}`.

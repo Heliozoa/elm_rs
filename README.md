@@ -1,20 +1,19 @@
 Automatically generate type definitions and functions for your Elm frontend from your Rust backend types. Currently supports generating
 - Elm types with the `Elm` trait and derive macro
 - JSON encoders and decoders, compatible with `serde` and `serde_json`, with the `ElmJson` trait and derive macro
-- Multipart form requests that can be parsed by Rocket's `FromForm` with the `ElmForm` and `ElmFormParts` traits and derive macros
 
 ### Usage
 For example, the following code
 ```rust
-use jalava::{Elm, ElmForm, ElmFormParts, ElmJson};
+use jalava::{Elm, ElmJson};
 
-#[derive(Elm, ElmJson, ElmFormParts)]
+#[derive(Elm, ElmJson)]
 enum Filetype {
     Jpeg,
     Png,
 }
 
-#[derive(Elm, ElmJson, ElmForm)]
+#[derive(Elm, ElmJson)]
 struct Drawing {
     title: String,
     authors: Vec<String>,
@@ -26,7 +25,7 @@ fn main() {
     // the target would typically be a file
     let mut target = vec![];
     // jalava provides a macro for conveniently creating an Elm module with everything needed
-    jalava::export!("Bindings", &mut target, Drawing, Filetype; Drawing).unwrap();
+    jalava::export!("Bindings", &mut target, Drawing, Filetype).unwrap();
     let output = String::from_utf8(target).unwrap();
     println!("{}", output);
 }
@@ -118,23 +117,11 @@ filetypeDecoder =
                 )
         ]
 
-prepareDrawing : Drawing -> Http.Body
-prepareDrawing form =
-    Http.multipartBody <|
-        List.concat
-            [ [ Http.stringPart ("title") (identity form.title) ]
-            , List.concat (List.concat (List.indexedMap (\i0 x0 -> [ [ Http.stringPart ("authors[" ++ String.fromInt i0 ++ "]") (identity x0) ] ]) (identity form.authors)))
-            , [ Http.stringPart ("filename") (identity form.filename) ]
-            , [ Http.stringPart "filetype" (filetypeToString form.filetype) ]
-            ]
-
-
 ```
 
 ### Cargo features
-- jalava-derive: Activated by default. Enables deriving the `Elm` and `ElmJson` (and `ElmForm` with with-rocket) traits.
+- jalava-derive: Activated by default. Enables deriving the `Elm` and `ElmJson` traits.
 - with-serde: Enables compatibility with many of serde's attributes. (`serde v1`)
-- with-rocket: Enables the `ElmForm` and `ElmFormParts` trait which allow easy integration with Rocket's multipart forms. (`rocket v0.5-rc`)
 - chrono: Trait implementations for chrono types. (`chrono v0.4`)
 - time: Trait implementations for time types. (`time v0.2`)
 - uuid: Trait implementations for uuid types. (`uuid v0.8`)
@@ -159,12 +146,11 @@ The `with-serde` feature enables compatibility with serde attributes. Currently 
 ### 0.1.0
 - [x] Generate Elm types with the `Elm` trait and derive macro
 - [x] Generate JSON encoders and decoders with the `ElmJson` trait and derive macro
-- [x] Generate Elm functions that create multipart requests compatible with Rocket's multipart form parsing through the `rocket::{ElmForm, ElmFormField}` traits and derive macros
 - [x] Basic generic support
 - [x] Compatibility with most serde attributes
 
 ### Planned
-- [ ] Compatibility with more complicated serde attributes
+- [ ] Compatibility with more serde attributes
   - [ ] flatten
   - [ ] alias
   - [ ] skip_(de)serializing
@@ -174,8 +160,6 @@ The `with-serde` feature enables compatibility with serde attributes. Currently 
   - [ ] SocketAddr, SocketAddrV4, SocketAddrV6
   - [ ] PhantomData
 - [ ] Handle recursive types
-- [ ] Improve generic support
-- [ ] Compatibility with rocket attributes (e.g. `field`)
 - [ ] Attributes for controlling the name of the Elm type etc.
 
 ### License
