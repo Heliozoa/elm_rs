@@ -52,6 +52,7 @@ resultDecoder errDecoder okDecoder =
         , Json.Decode.map Err (Json.Decode.field "Err" errDecoder)
         ]
 
+
 resultEncoder : (e -> Json.Encode.Value) -> (t -> Json.Encode.Value) -> (Result e t -> Json.Encode.Value)
 resultEncoder errEncoder okEncoder enum =
     case enum of
@@ -127,11 +128,11 @@ filetypeDecoder =
 ```
 
 ### Cargo features
-- jalava-derive: Activated by default. Enables deriving the `Elm` and `ElmJson` traits.
-- with-serde: Enables compatibility with many of serde's attributes. (`serde v1`)
-- chrono: Trait implementations for chrono types. (`chrono v0.4`)
-- time: Trait implementations for time types. (`time v0.2`)
-- uuid: Trait implementations for uuid types. (`uuid v0.8`)
+- `jalava-derive`: Activated by default. Enables deriving the `Elm` and `ElmJson` traits.
+- `with-serde`: Enables compatibility with many of serde's attributes. (`serde v1`)
+- `chrono`: Trait implementations for chrono types. (`chrono v0.4`)
+- `time`: Trait implementations for time types. (`time v0.2`)
+- `uuid`: Trait implementations for uuid types. (`uuid v0.8`)
 
 ### Serde compatibility
 The `with-serde` feature enables compatibility with serde attributes. Currently the following attributes are supported:
