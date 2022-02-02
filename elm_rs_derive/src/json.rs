@@ -63,12 +63,12 @@ fn intermediate_to_token_stream(
     };
 
     for p in generics.type_params_mut() {
-        p.bounds.push(syn::parse_str("::jalava::Elm").unwrap());
-        p.bounds.push(syn::parse_str("::jalava::ElmJson").unwrap());
+        p.bounds.push(syn::parse_str("::elm_rs::Elm").unwrap());
+        p.bounds.push(syn::parse_str("::elm_rs::ElmJson").unwrap());
     }
 
     let res = quote! {
-        impl #generics ::jalava::ElmJson for #ident #generics_without_bounds {
+        impl #generics ::elm_rs::ElmJson for #ident #generics_without_bounds {
             fn decoder_type() -> ::std::string::String {
                 ::std::convert::From::from(#decoder_type)
             }
@@ -222,7 +222,7 @@ fn struct_named(
         let field_name_deserialize = field.name_deserialize();
         field_decoders.push(quote!{::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{field_name_deserialize}\" ({decoder})))",
                 field_name_deserialize = #field_name_deserialize,
-                decoder = <#ty as ::jalava::ElmJson>::decoder_type(),
+                decoder = <#ty as ::elm_rs::ElmJson>::decoder_type(),
         )});
     }
     let decoder = quote! {::std::format!("\
@@ -248,7 +248,7 @@ fn struct_named(
         field_encoders.push(
             quote! {::std::format!("( \"{field_name_serialize}\", ({encoder}) struct.{field_name} )",
             field_name_serialize = #field_name_serialize,
-            encoder = <#ty as ::jalava::ElmJson>::encoder_type(),
+            encoder = <#ty as ::elm_rs::ElmJson>::encoder_type(),
             field_name = #field_name)},
         )
     }
@@ -786,14 +786,14 @@ fn enum_variant_newtype_external(
             Json.Encode.object [ ( \"{variant_name_serialize}\", {encoder} inner ) ]",
         variant_name = #variant_name,
         variant_name_serialize = #variant_name_serialize,
-        encoder = <#inner_type as ::jalava::ElmJson>::encoder_type(),
+        encoder = <#inner_type as ::elm_rs::ElmJson>::encoder_type(),
     )};
 
     let decoder = quote! {::std::format!("\
     Json.Decode.map {enum_variant} (Json.Decode.field \"{enum_variant_deserialize}\" ({decoder}))",
         enum_variant = #variant_name,
         enum_variant_deserialize = #variant_name_deserialize,
-        decoder = <#inner_type as ::jalava::ElmJson>::decoder_type(),
+        decoder = <#inner_type as ::elm_rs::ElmJson>::decoder_type(),
     )};
 
     Coder { encoder, decoder }
@@ -825,7 +825,7 @@ fn enum_variant_tuple_external(
         encoders = (
             &[
                 #(::std::format!("{} t{}",
-                    <#tuple_types as ::jalava::ElmJson>::encoder_type(),
+                    <#tuple_types as ::elm_rs::ElmJson>::encoder_type(),
                     #idx
                 )),*
             ]
@@ -840,7 +840,7 @@ fn enum_variant_tuple_external(
             &[
                 #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.index {} ({}) |> Json.Decode.map x)",
                     #idx,
-                    <#tuple_types as ::jalava::ElmJson>::decoder_type()
+                    <#tuple_types as ::elm_rs::ElmJson>::decoder_type()
                 )),*
             ]
         ).join(" ")
@@ -884,7 +884,7 @@ fn enum_variant_struct_external(
             &[
                 #(::std::format!("( \"{}\", {} {} )",
                     #field_names_serialize,
-                    <#tys as ::jalava::ElmJson>::encoder_type(),
+                    <#tys as ::elm_rs::ElmJson>::encoder_type(),
                     #field_names,
                 )),*
             ]
@@ -899,7 +899,7 @@ fn enum_variant_struct_external(
                 &[
                     #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{}\" ({})))",
                         #field_names_deserialize,
-                        <#tys as ::jalava::ElmJson>::decoder_type()
+                        <#tys as ::elm_rs::ElmJson>::decoder_type()
                     )),*
                 ]
             ).join(" "),
@@ -998,7 +998,7 @@ fn enum_variant_struct_internal(
                 &[
                     #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{}\" ({})))",
                         #field_names_deserialize,
-                        <#tys as ::jalava::ElmJson>::decoder_type()
+                        <#tys as ::elm_rs::ElmJson>::decoder_type()
                     )),*
                 ]
             ).join(" "),
@@ -1032,7 +1032,7 @@ fn enum_variant_newtype_adjacent(
         tag = #tag,
         content = #content,
         variant_name_serialize = #variant_name_serialize,
-        encoder = <#inner_type as ::jalava::ElmJson>::encoder_type(),
+        encoder = <#inner_type as ::elm_rs::ElmJson>::encoder_type(),
     )};
 
     let decoder = quote! {::std::format!("\
@@ -1041,7 +1041,7 @@ fn enum_variant_newtype_adjacent(
         variant_name = #variant_name,
         variant_name_deserialize = #variant_name_deserialize,
         content = #content,
-        decoder = <#inner_type as ::jalava::ElmJson>::decoder_type(),
+        decoder = <#inner_type as ::elm_rs::ElmJson>::decoder_type(),
     )};
 
     Coder { encoder, decoder }
@@ -1078,7 +1078,7 @@ fn enum_variant_tuple_adjacent(
         variant_name_serialize = #variant_name_serialize,
         encoders = (
             &[
-                #(::std::format!("{} t{}", <#tuple_types as ::jalava::ElmJson>::encoder_type(), #idx)
+                #(::std::format!("{} t{}", <#tuple_types as ::elm_rs::ElmJson>::encoder_type(), #idx)
                 ),*
             ]
         ).join(", "),
@@ -1094,7 +1094,7 @@ fn enum_variant_tuple_adjacent(
             &[
                 #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.index {} ({}) |> Json.Decode.map x)",
                     #idx,
-                    <#tuple_types as ::jalava::ElmJson>::decoder_type())
+                    <#tuple_types as ::elm_rs::ElmJson>::decoder_type())
                 ),*
             ]
         ).join(" "),
@@ -1140,7 +1140,7 @@ fn enum_variant_struct_adjacent(
             &[
                 #(::std::format!("( \"{}\", {} {} )",
                     #field_names_serialize,
-                    <#tys as ::jalava::ElmJson>::encoder_type(),
+                    <#tys as ::elm_rs::ElmJson>::encoder_type(),
                     #field_names,
                 )),*
             ]
@@ -1153,7 +1153,7 @@ fn enum_variant_struct_adjacent(
         let field_name_deserialize = field.name_deserialize();
         field_decoders.push(quote!{::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{field_name_deserialize}\" ({decoder})))",
                 field_name_deserialize = #field_name_deserialize,
-                decoder = <#ty as ::jalava::ElmJson>::decoder_type(),
+                decoder = <#ty as ::elm_rs::ElmJson>::decoder_type(),
         )});
     }
     let decoder = quote! {::std::format!("\
@@ -1208,13 +1208,13 @@ fn enum_variant_newtype_untagged(variant_name: &str, inner: &Type) -> Coder {
 {variant_name} inner ->
             {encoder} inner",
         variant_name = #variant_name,
-        encoder = <#inner as ::jalava::ElmJson>::encoder_type(),
+        encoder = <#inner as ::elm_rs::ElmJson>::encoder_type(),
     )};
 
     let decoder = quote! {::std::format!("\
     Json.Decode.map {variant_name} ({decoder})",
         variant_name = #variant_name,
-        decoder = <#inner as ::jalava::ElmJson>::decoder_type(),
+        decoder = <#inner as ::elm_rs::ElmJson>::decoder_type(),
     )};
 
     Coder { encoder, decoder }
@@ -1244,7 +1244,7 @@ fn enum_variant_tuple_untagged(variant_name: &str, tuple_types: &[Type]) -> Code
         encoders = (
             &[
                 #(::std::format!("({}) t{}",
-                    <#tuple_types as ::jalava::ElmJson>::encoder_type(),
+                    <#tuple_types as ::elm_rs::ElmJson>::encoder_type(),
                     #idx
                 )),*
             ]
@@ -1259,7 +1259,7 @@ fn enum_variant_tuple_untagged(variant_name: &str, tuple_types: &[Type]) -> Code
             &[
                 #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.index {} ({}) |> Json.Decode.map x)",
                     #idx,
-                    <#tuple_types as ::jalava::ElmJson>::decoder_type()
+                    <#tuple_types as ::elm_rs::ElmJson>::decoder_type()
                 )),*
             ]
         ).join(" ")
@@ -1300,7 +1300,7 @@ fn enum_variant_struct_untagged(
             &[
                 #(::std::format!("( \"{}\", {} {} )",
                     #field_names_serialize,
-                    <#tys as ::jalava::ElmJson>::encoder_type(),
+                    <#tys as ::elm_rs::ElmJson>::encoder_type(),
                     #field_names,
                 )),*
             ]
@@ -1314,7 +1314,7 @@ fn enum_variant_struct_untagged(
                 &[
                     #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{}\" ({})))",
                         #field_names_deserialize,
-                        <#tys as ::jalava::ElmJson>::decoder_type()
+                        <#tys as ::elm_rs::ElmJson>::decoder_type()
                     )),*
                 ]
             ).join(" "),

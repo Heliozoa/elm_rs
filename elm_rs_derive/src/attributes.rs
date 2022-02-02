@@ -84,7 +84,7 @@ pub(crate) fn parse_container_attributes(attrs: &[Attribute]) -> ContainerAttrib
     let mut attributes = ContainerAttributes::default();
     for attr in attrs {
         if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
-            if meta_list.path.is_ident("jalava") {
+            if meta_list.path.is_ident("elm_rs") {
                 // todo
             } else if meta_list.path.is_ident("serde") {
                 #[cfg(feature = "serde")]
@@ -100,7 +100,7 @@ pub(crate) fn parse_variant_attributes(attrs: &[Attribute]) -> VariantAttributes
 
     for attr in attrs {
         if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
-            if meta_list.path.is_ident("jalava") {
+            if meta_list.path.is_ident("elm_rs") {
                 // todo
             } else if meta_list.path.is_ident("serde") {
                 #[cfg(feature = "serde")]
@@ -116,7 +116,7 @@ pub(crate) fn parse_field_attributes(attrs: &[Attribute]) -> FieldAttributes {
     let mut attributes = FieldAttributes::default();
     for attr in attrs {
         if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
-            if meta_list.path.is_ident("jalava") {
+            if meta_list.path.is_ident("elm_rs") {
                 // todo
             } else if meta_list.path.is_ident("serde") {
                 #[cfg(feature = "serde")]

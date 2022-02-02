@@ -1,7 +1,7 @@
 //! Contains the `ElmQuery` trait.
 
-#[cfg(feature = "jalava-derive")]
-pub use jalava_derive::ElmQuery;
+#[cfg(feature = "derive")]
+pub use elm_rs_derive::ElmQuery;
 
 /// Used to generate URL encoded key-value pairs in Elm.
 pub trait ElmQuery {

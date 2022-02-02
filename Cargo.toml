@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "jalava",
-    "jalava-derive"
+    "elm_rs",
+    "elm_rs_derive"
 ]
 resolver = "2"

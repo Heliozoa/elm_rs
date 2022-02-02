@@ -5,7 +5,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
-use crate::{EnumVariantKind, Intermediate, StructField, TypeInfo};
+use crate::{EnumVariantKind, Intermediate, TypeInfo};
 
 pub fn derive(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
@@ -38,7 +38,7 @@ fn intermediate_to_token_stream(
                 let field_name_serialize = field.name_serialize();
                 query_fields.push(
                     quote! {::std::format!("{query_type} \"{field_name_serialize}\" {field_value}",
-                        query_type = <#ty as ::jalava::ElmQueryField>::field_type(),
+                        query_type = <#ty as ::elm_rs::ElmQueryField>::field_type(),
                         field_name_serialize = #field_name_serialize,
                         field_value = ::std::format!("struct.{field_name}",
                             field_name = #field_name
@@ -74,7 +74,7 @@ urlEncode{elm_type} struct =
                         let field_name_serialize = field.name_serialize();
                         query_fields.push(
                             quote! {::std::format!("{query_type} \"{field_name_serialize}\" {field_value}",
-                                query_type = <#ty as ::jalava::ElmQueryField>::field_type(),
+                                query_type = <#ty as ::elm_rs::ElmQueryField>::field_type(),
                                 field_name_serialize = #field_name_serialize,
                                 field_value = #field_name
                             )},
@@ -123,12 +123,12 @@ urlEncode{elm_type} enum =
     };
 
     for p in generics.type_params_mut() {
-        p.bounds.push(syn::parse_str("::jalava::Elm").unwrap());
-        p.bounds.push(syn::parse_str("::jalava::ElmJson").unwrap());
+        p.bounds.push(syn::parse_str("::elm_rs::Elm").unwrap());
+        p.bounds.push(syn::parse_str("::elm_rs::ElmJson").unwrap());
     }
 
     let res = quote! {
-        impl #generics ::jalava::ElmQuery for #ident #generics_without_bounds {
+        impl #generics ::elm_rs::ElmQuery for #ident #generics_without_bounds {
             fn elm_query() -> ::std::string::String {
                 #ts
             }

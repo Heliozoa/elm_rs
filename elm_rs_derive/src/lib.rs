@@ -1,4 +1,4 @@
-//! Derive macros for jalava.
+//! Derive macros for elm_rs.
 
 mod attributes;
 mod elm;

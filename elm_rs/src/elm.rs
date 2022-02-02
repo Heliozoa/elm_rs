@@ -1,7 +1,7 @@
 //! Contains the `Elm` trait.
 
-#[cfg(feature = "jalava-derive")]
-pub use jalava_derive::Elm;
+#[cfg(feature = "derive")]
+pub use elm_rs_derive::Elm;
 
 /// Used to represent Rust types in Elm.
 pub trait Elm {

@@ -1,5 +1,5 @@
 [package]
-name = "jalava-derive"
+name = "elm_rs_derive"
 version = "0.1.0"
 edition = "2021"
 authors = ["Heliozoa <daniel.x.martinez@helsinki.fi>"]

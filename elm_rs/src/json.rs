@@ -2,8 +2,8 @@
 
 use crate::Elm;
 
-#[cfg(feature = "jalava-derive")]
-pub use jalava_derive::ElmJson;
+#[cfg(feature = "derive")]
+pub use elm_rs_derive::ElmJson;
 
 /// Used to generate JSON encoders and decoders for our Rust types in Elm.
 pub trait ElmJson {

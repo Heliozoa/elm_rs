@@ -1,5 +1,5 @@
 [package]
-name = "jalava"
+name = "elm_rs"
 version = "0.1.0"
 edition = "2021"
 authors = ["Heliozoa <daniel.x.martinez@helsinki.fi>"]
@@ -9,11 +9,11 @@ resolver = "2"
 
 [features]
 default = ["derive"]
-derive = ["jalava-derive", "jalava-derive/json", "jalava-derive/query"]
-with-serde = ["jalava-derive/json", "jalava-derive/serde"]
+derive = ["elm_rs_derive", "elm_rs_derive/json", "elm_rs_derive/query"]
+with-serde = ["elm_rs_derive/json", "elm_rs_derive/serde"]
 
 [dependencies]
-jalava-derive = { path = "../jalava-derive", optional = true }
+elm_rs_derive = { path = "../elm_rs_derive", optional = true }
 
 # optional
 chrono = { version = "0.4.19", optional = true }
