@@ -38,8 +38,27 @@ prints out
 module Bindings exposing (..)
 
 import Dict exposing (Dict)
+import File
+import Http
 import Json.Decode
 import Json.Encode
+import Url.Builder
+
+
+resultDecoder : Json.Decode.Decoder e -> Json.Decode.Decoder t -> Json.Decode.Decoder (Result e t)
+resultDecoder errDecoder okDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map Ok (Json.Decode.field "Ok" okDecoder)
+        , Json.Decode.map Err (Json.Decode.field "Err" errDecoder)
+        ]
+
+resultEncoder : (e -> Json.Encode.Value) -> (t -> Json.Encode.Value) -> (Result e t -> Json.Encode.Value)
+resultEncoder errEncoder okEncoder enum =
+    case enum of
+        Ok inner ->
+            Json.Encode.object [ ( "Ok", okEncoder inner ) ]
+        Err inner ->
+            Json.Encode.object [ ( "Err", errEncoder inner ) ]
 
 
 type alias Drawing =
@@ -63,10 +82,10 @@ drawingEncoder struct =
 drawingDecoder : Json.Decode.Decoder Drawing
 drawingDecoder =
     Json.Decode.succeed Drawing
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.oneOf [ Json.Decode.field "title" (Json.Decode.string) ]))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.oneOf [ Json.Decode.field "authors" (Json.Decode.list (Json.Decode.string)) ]))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.oneOf [ Json.Decode.field "filename" (Json.Decode.string) ]))
-        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.oneOf [ Json.Decode.field "filetype" (filetypeDecoder) ]))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "title" (Json.Decode.string)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "authors" (Json.Decode.list (Json.Decode.string))))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "filename" (Json.Decode.string)))
+        |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "filetype" (filetypeDecoder)))
 
 
 type Filetype
