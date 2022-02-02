@@ -11,20 +11,20 @@ enum Enum {
 
 #[test]
 fn unit() {
-    super::test(Enum::Unit);
+    super::test_json(Enum::Unit);
 }
 
 #[test]
 fn newtype() {
-    super::test(Enum::Newtype(123));
+    super::test_json(Enum::Newtype(123));
 }
 
 #[test]
 fn tuple() {
-    super::test(Enum::Tuple(123, 234));
+    super::test_json(Enum::Tuple(123, 234));
 }
 
 #[test]
 fn named() {
-    super::test(Enum::Named { field: 123 });
+    super::test_json(Enum::Named { field: 123 });
 }

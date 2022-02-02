@@ -8,7 +8,8 @@ readme = "../README.md"
 resolver = "2"
 
 [features]
-default = ["jalava-derive", "jalava-derive/json"]
+default = ["derive"]
+derive = ["jalava-derive", "jalava-derive/json", "jalava-derive/query"]
 with-serde = ["jalava-derive/json", "jalava-derive/serde"]
 
 [dependencies]

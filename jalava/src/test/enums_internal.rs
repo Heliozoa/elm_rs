@@ -10,10 +10,10 @@ enum Enum {
 
 #[test]
 fn unit() {
-    super::test(Enum::Unit);
+    super::test_json(Enum::Unit);
 }
 
 #[test]
 fn named() {
-    super::test(Enum::Named { field: 123 });
+    super::test_json(Enum::Named { field: 123 });
 }

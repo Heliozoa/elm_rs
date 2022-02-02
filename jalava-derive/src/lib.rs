@@ -4,6 +4,8 @@ mod attributes;
 mod elm;
 #[cfg(feature = "json")]
 mod json;
+#[cfg(feature = "query")]
+mod query;
 
 use self::attributes::*;
 use heck::{ToLowerCamelCase, ToPascalCase};
@@ -18,14 +20,21 @@ use syn::{
 /// Derive `Elm`.
 #[proc_macro_derive(Elm)]
 pub fn derive_elm(input: TokenStream) -> TokenStream {
-    elm::derive_elm(input)
+    elm::derive(input)
 }
 
 /// Derive `ElmJson`.
 #[cfg(feature = "json")]
 #[proc_macro_derive(ElmJson)]
 pub fn derive_elm_json(input: TokenStream) -> TokenStream {
-    json::derive_elm_json(input)
+    json::derive(input)
+}
+
+/// Derive `ElmQuery`.
+#[cfg(feature = "query")]
+#[proc_macro_derive(ElmQuery)]
+pub fn derive_elm_query(input: TokenStream) -> TokenStream {
+    query::derive(input)
 }
 
 /// Intermediate representation of the derive input for more convenient handling.
@@ -62,7 +71,8 @@ struct StructField {
     rename: Option<Rename>,
     rename_deserialize: Option<Rename>,
     rename_serialize: Option<Rename>,
-    aliases: Vec<String>,
+    // todo
+    // aliases: Vec<String>,
     ty: Type,
 }
 
@@ -347,7 +357,8 @@ fn fields_named_to_struct_fields(
                         .serde_rename_all_deserialize
                         .map(Rename::Container)
                 }),
-            aliases: field_attributes.serde_aliases,
+            // todo
+            // aliases: field_attributes.serde_aliases,
             ty: field.ty,
         })
         .collect()

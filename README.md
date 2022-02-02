@@ -136,10 +136,10 @@ The `with-serde` feature enables compatibility with serde attributes. Currently 
 - [x] Generate JSON encoders and decoders with the `ElmJson` trait and derive macro
 - [x] Basic generic support
 - [x] Compatibility with most serde attributes
+- [x] Support for simple forms and queries
 
 ### Planned
-- [ ] Support for forms
-- [ ] Support for queries
+- [ ] Support for complex forms and queries
 - [ ] Compatibility with more serde attributes
   - [ ] flatten
   - [ ] alias
@@ -151,6 +151,24 @@ The `with-serde` feature enables compatibility with serde attributes. Currently 
   - [ ] PhantomData
 - [ ] Handle recursive types
 - [ ] Attributes for controlling the name of the Elm type etc.
+
+### Known limitations
+Generic types are not well supported when they are used with more than one set of concrete types. For example, for
+```rust
+struct Generic<T>(T);
+```
+`Generic::<u32>::elm_definition()` and `Generic::<String>::elm_definition()` will both use the name `Generic` for the Elm definition, causing an error in Elm. Accidentally using different generic types for the generated JSON and the Elm definition can also result in some confusing error messages.
+
+Reusing enum variant names is allowed in Rust but not in Elm. Therefore generating definitions for the two enums
+```rust
+enum Enum1 {
+    Variant
+}
+enum Enum2 {
+    Variant
+}
+```
+will cause an error in Elm due to `Variant` being ambiguous.
 
 ### License
 Licensed under either one of

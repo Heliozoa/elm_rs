@@ -1,4 +1,4 @@
-//! Derive macros for ElmJson.
+//! Derive macro for ElmJson.
 
 use super::{EnumVariantKind, Intermediate, TypeInfo};
 use crate::{EnumRepresentation, EnumVariant, StructField};
@@ -8,7 +8,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Type};
 
-pub fn derive_elm_json(input: TokenStream) -> TokenStream {
+pub fn derive(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
     let intermediate = match super::derive_input_to_intermediate(derive_input) {
         Ok(intermediate) => intermediate,
@@ -220,7 +220,7 @@ fn struct_named(
     for field in fields {
         let ty = &field.ty;
         let field_name_deserialize = field.name_deserialize();
-        field_decoders.push(quote!{::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.oneOf [ Json.Decode.field \"{field_name_deserialize}\" ({decoder}) ]))",
+        field_decoders.push(quote!{::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{field_name_deserialize}\" ({decoder})))",
                 field_name_deserialize = #field_name_deserialize,
                 decoder = <#ty as ::jalava::ElmJson>::decoder_type(),
         )});
@@ -368,7 +368,7 @@ fn enum_external(
                 &[
                     #(#constructors),*
                 ]
-            ).join("\n        ")
+            ).join("\n            ")
         )}
     };
 
@@ -1151,15 +1151,9 @@ fn enum_variant_struct_adjacent(
     for field in fields {
         let ty = &field.ty;
         let field_name_deserialize = field.name_deserialize();
-        let alias_decoders = field
-            .aliases
-            .iter()
-            .map(|a| quote! {::std::format!(", Json.Decode.field \"{}\" ({})", #a, <#ty as ::jalava::ElmJson>::decoder_type())})
-            .collect::<Vec<_>>();
-        field_decoders.push(quote!{::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.oneOf [Json.Decode.field \"{field_name_deserialize}\" ({decoder}){alias_decoders}]))",
+        field_decoders.push(quote!{::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{field_name_deserialize}\" ({decoder})))",
                 field_name_deserialize = #field_name_deserialize,
                 decoder = <#ty as ::jalava::ElmJson>::decoder_type(),
-                alias_decoders = (&[#(#alias_decoders),*] as &[::std::string::String]).join("")
         )});
     }
     let decoder = quote! {::std::format!("\

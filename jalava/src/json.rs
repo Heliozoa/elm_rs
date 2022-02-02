@@ -17,6 +17,24 @@ pub trait ElmJson {
     fn encoder_definition() -> Option<String>;
 }
 
+impl ElmJson for () {
+    fn decoder_type() -> String {
+        "Json.Decode.null ()".to_string()
+    }
+
+    fn decoder_definition() -> Option<String> {
+        None
+    }
+
+    fn encoder_type() -> String {
+        r#"(\_ -> Json.Encode.null)"#.to_string()
+    }
+
+    fn encoder_definition() -> Option<String> {
+        None
+    }
+}
+
 impl<T> ElmJson for (T,)
 where
     T: Elm + ElmJson,
@@ -180,42 +198,40 @@ durationEncoder duration =
 
 impl<T: Elm + ElmJson, E: Elm + ElmJson> ElmJson for Result<T, E> {
     fn decoder_type() -> String {
-        "resultDecoder".to_string()
+        format!(
+            "resultDecoder ({}) ({})",
+            E::decoder_type(),
+            T::decoder_type()
+        )
     }
 
     fn decoder_definition() -> Option<String> {
-        Some(::std::format!(
-            r#"resultDecoder : Json.Decode.Decoder (Result {} {})
-resultDecoder =
+        Some(r#"resultDecoder : Json.Decode.Decoder e -> Json.Decode.Decoder t -> Json.Decode.Decoder (Result e t)
+resultDecoder errDecoder okDecoder =
     Json.Decode.oneOf
-        [ Json.Decode.map Ok (Json.Decode.field "Ok" ({}))
-        , Json.Decode.map Err (Json.Decode.field "Err" ({}))
-        ]"#,
-            T::elm_type(),
-            E::elm_type(),
-            T::decoder_type(),
-            E::decoder_type()
-        ))
+        [ Json.Decode.map Ok (Json.Decode.field "Ok" okDecoder)
+        , Json.Decode.map Err (Json.Decode.field "Err" errDecoder)
+        ]"#
+            .to_string())
     }
 
     fn encoder_type() -> String {
-        "resultEncoder".to_string()
+        format!(
+            "resultEncoder ({}) ({})",
+            E::encoder_type(),
+            T::encoder_type()
+        )
     }
 
     fn encoder_definition() -> Option<String> {
-        Some(::std::format!(
-            r#"resultEncoder : (Result {} {}) -> Json.Encode.Value
-resultEncoder enum =
+        Some(r#"resultEncoder : (e -> Json.Encode.Value) -> (t -> Json.Encode.Value) -> (Result e t -> Json.Encode.Value)
+resultEncoder errEncoder okEncoder enum =
     case enum of
         Ok inner ->
-            Json.Encode.object [ ( "Ok", {} inner ) ]
+            Json.Encode.object [ ( "Ok", okEncoder inner ) ]
         Err inner ->
-            Json.Encode.object [ ( "Err", {} inner ) ]"#,
-            T::elm_type(),
-            E::elm_type(),
-            T::encoder_type(),
-            E::encoder_type()
-        ))
+            Json.Encode.object [ ( "Err", errEncoder inner ) ]"#
+            .to_string())
     }
 }
 

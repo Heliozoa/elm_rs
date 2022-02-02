@@ -51,12 +51,12 @@ struct Skip {
 
 #[test]
 fn transparent_struct() {
-    super::test(TransparentNamed { field: 0 });
+    super::test_json(TransparentNamed { field: 0 });
 }
 
 #[test]
 fn transparent_newtype() {
-    super::test(TransparentNewtype(0));
+    super::test_json(TransparentNewtype(0));
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn other() {
 
 #[test]
 fn rename_struct() {
-    super::test(RenameStruct {
+    super::test_json(RenameStruct {
         uppercase: 0,
         renamed: 0,
         rename_for_serialization: 0,
@@ -77,15 +77,15 @@ fn rename_struct() {
 
 #[test]
 fn rename_enum() {
-    super::test(RenameEnum::Uppercase);
-    super::test(RenameEnum::Renamed);
-    super::test(RenameEnum::RenameForSerialization);
-    super::test(RenameEnum::RenameForDeserialization);
+    super::test_json(RenameEnum::Uppercase);
+    super::test_json(RenameEnum::Renamed);
+    super::test_json(RenameEnum::RenameForSerialization);
+    super::test_json(RenameEnum::RenameForDeserialization);
 }
 
 #[test]
 fn skip() {
-    super::test(Skip {
+    super::test_json(Skip {
         skipped: 0,
         not_skipped: 0,
     });

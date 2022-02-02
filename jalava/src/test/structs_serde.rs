@@ -24,22 +24,22 @@ struct Named {
 
 #[test]
 fn unit() {
-    super::test(Unit);
+    super::test_json(Unit);
 }
 
 #[test]
 fn newtype() {
-    super::test(Newtype(123));
+    super::test_json(Newtype(123));
 }
 
 #[test]
 fn tuple() {
-    super::test(Tuple(123, 234));
+    super::test_json(Tuple(123, 234));
 }
 
 #[test]
 fn named() {
-    super::test(Named {
+    super::test_json(Named {
         field: 123,
         renamed: 0,
     });

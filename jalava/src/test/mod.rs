@@ -1,4 +1,4 @@
-use crate::{Elm, ElmJson};
+use crate::{Elm, ElmJson, ElmQuery};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fmt::Debug,
@@ -13,26 +13,27 @@ mod enums_internal;
 mod enums_untagged;
 mod etc_serde;
 mod hygiene;
+mod query;
 mod structs;
 mod structs_serde;
 mod types;
 
-fn test<T: Elm + ElmJson + Serialize + DeserializeOwned + PartialEq + Debug>(t: T) {
-    let t_2 = test_without_eq(&t, "");
+fn test_json<T: Elm + ElmJson + Serialize + DeserializeOwned + PartialEq + Debug>(t: T) {
+    let t_2 = test_json_without_eq(&t, "");
     assert_eq!(t, t_2);
     return;
 }
 
-fn test_with_deps<T: Elm + ElmJson + Serialize + DeserializeOwned + PartialEq + Debug>(
+fn test_json_with_deps<T: Elm + ElmJson + Serialize + DeserializeOwned + PartialEq + Debug>(
     t: T,
     deps: &str,
 ) {
-    let t_2 = test_without_eq(&t, deps);
+    let t_2 = test_json_without_eq(&t, deps);
     assert_eq!(t, t_2);
     return;
 }
 
-fn test_without_eq<T: Elm + ElmJson + Serialize + DeserializeOwned + Debug>(
+fn test_json_without_eq<T: Elm + ElmJson + Serialize + DeserializeOwned + Debug>(
     t: &T,
     deps: &str,
 ) -> T {
@@ -50,21 +51,16 @@ fn test_with_json<T: Elm + ElmJson + Serialize + DeserializeOwned + Debug>(
     let encoder = T::encoder_definition().unwrap();
     let decoder = T::decoder_definition().unwrap();
 
-    let mut cmd = Command::new("elm")
-        .arg("repl")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-
-    let mut stdin = cmd.stdin.take().unwrap();
-    writeln!(
-        stdin,
+    let input = format!(
         r#"
 import Json.Decode
 import Json.Encode
 import Dict exposing (Dict)
+
+
+{}
+
+{}
 
 {}
 
@@ -90,9 +86,76 @@ s
 
 :exit
 "#,
-        deps, elm_type, encoder, decoder, decoder_type, json, encoder_type
-    )
-    .unwrap();
+        deps,
+        Result::<(), ()>::decoder_definition().unwrap(),
+        Result::<(), ()>::encoder_definition().unwrap(),
+        elm_type,
+        encoder,
+        decoder,
+        decoder_type,
+        json,
+        encoder_type
+    );
+
+    let json = run_repl(&input);
+    let unescaped = unescape::unescape(&json).unwrap();
+    println!("{}", unescaped);
+    return serde_json::from_str(&unescaped).unwrap();
+}
+
+fn test_query<T: Elm + ElmJson + ElmQuery + Serialize>(val: T, expected: &str) {
+    let json = serde_json::to_string(&val).unwrap().replace("\"", "\\\"");
+    let decoder_type = T::decoder_type();
+    let elm_type = T::elm_definition().unwrap();
+    let query = T::elm_query();
+    let query_function = format!("urlEncode{}", T::elm_type());
+    let decoder = T::decoder_definition().unwrap();
+
+    let input = format!(
+        r#"
+import Json.Decode
+import Url.Builder
+
+{}
+
+{}
+
+{}
+
+decoded = Json.Decode.decodeString {} "{}"
+
+
+s = case decoded of
+    Ok value ->
+        Url.Builder.toQuery ({} value)
+    Err err ->
+        Json.Decode.errorToString err
+
+"START"
+s
+"END"
+
+:exit
+"#,
+        elm_type, query, decoder, decoder_type, json, query_function
+    );
+    let output = run_repl(&input);
+    assert_eq!(output, expected);
+}
+
+fn run_repl(input: &str) -> String {
+    println!("{}", input);
+    let mut cmd = Command::new("elm")
+        .arg("repl")
+        .current_dir("test")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let mut stdin = cmd.stdin.take().unwrap();
+    stdin.write_all(input.as_bytes()).unwrap();
 
     let output = cmd.wait_with_output().unwrap();
 
@@ -111,10 +174,7 @@ s
         if reading {
             let first_quote = line.find('"').unwrap();
             let last_quote = line.rfind('"').unwrap();
-            let json = &line[first_quote + 1..last_quote];
-            let unescaped = unescape::unescape(json).unwrap();
-            println!("{}", unescaped);
-            return serde_json::from_str(&unescaped).unwrap();
+            return line[first_quote + 1..last_quote].to_string();
         }
         if line.contains("START") {
             reading = true;

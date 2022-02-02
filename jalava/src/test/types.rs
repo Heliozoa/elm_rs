@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize, Elm, ElmJson)]
 struct Types<T: Copy + Hash + Eq> {
     t: T,
+    unit: (),
     one: (u8,),
     two: (u8, u8),
     three: (u8, u8, u8),
@@ -51,7 +52,8 @@ struct Types<T: Copy + Hash + Eq> {
     ni32: NonZeroI32,
     ni64: NonZeroI64,
     nisize: NonZeroIsize,
-    option: Option<T>,
+    option_some: Option<T>,
+    option_none: Option<T>,
     pathbuf: PathBuf,
     rc: Rc<T>,
     refcell: RefCell<T>,
@@ -78,9 +80,10 @@ struct Types<T: Copy + Hash + Eq> {
 
 #[test]
 fn types() {
-    super::test_without_eq(
+    super::test_json_without_eq(
         &Types {
             t: 0u8,
+            unit: (),
             one: (0,),
             two: (0, 0),
             three: (0, 0, 0),
@@ -116,7 +119,8 @@ fn types() {
             ni32: NonZeroI32::new(1).unwrap(),
             ni64: NonZeroI64::new(1).unwrap(),
             nisize: NonZeroIsize::new(1).unwrap(),
-            option: None,
+            option_some: Some(0),
+            option_none: None,
             pathbuf: PathBuf::default(),
             rc: Rc::new(0),
             refcell: RefCell::new(0),
@@ -165,8 +169,8 @@ fn types() {
             std::time::SystemTime::elm_definition().unwrap(),
             std::time::SystemTime::encoder_definition().unwrap(),
             std::time::SystemTime::decoder_definition().unwrap(),
-            Result::<u8, u8>::encoder_definition().unwrap(),
-            Result::<u8, u8>::decoder_definition().unwrap(),
+            Result::<(), ()>::encoder_definition().unwrap(),
+            Result::<(), ()>::decoder_definition().unwrap(),
         ),
     );
 }

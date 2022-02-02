@@ -6,7 +6,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Type};
 
-pub fn derive_elm(input: TokenStream) -> TokenStream {
+pub fn derive(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
     let intermediate = match super::derive_input_to_intermediate(derive_input) {
         Ok(intermediate) => intermediate,

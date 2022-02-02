@@ -1,52 +1,58 @@
 use crate::{Elm, ElmJson};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
-enum E {
-    Unit,
-    Newtype(u8),
-    Tuple(u8, u8),
-    Named { u8: u8 },
+#[derive(Debug, Elm, ElmJson, Serialize, Deserialize, PartialEq)]
+enum Enum1<T> {
+    Unit1,
+    Newtype1(T),
+    Tuple1(T, T),
+    Named1 { t: T },
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
-struct S {
-    e1: Vec<E>,
-    e2: Vec<E>,
+#[derive(Debug, Elm, ElmJson, Serialize, Deserialize, PartialEq)]
+enum Enum2<T> {
+    Unit2,
+    Newtype2(T),
+    Tuple2(T, T),
+    Named2 { t: T },
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
-enum E2 {
-    E2e(Vec<E>),
-    E2s(Vec<S>),
-    E2es(Vec<E>, Vec<S>),
-    E2se { es: Vec<S>, ee: Vec<E> },
-}
-
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
-struct S2 {
-    fe: Vec<E>,
-    fs: Vec<S>,
-    fe2: Vec<E2>,
+#[derive(Debug, Elm, ElmJson, Serialize, Deserialize, PartialEq)]
+struct Struct<T> {
+    unit: Enum1<T>,
+    newtype: Enum1<T>,
+    tuple: Enum1<T>,
+    named: Enum1<T>,
+    named_unit: Enum2<Enum1<T>>,
+    named_newtype: Enum2<Enum1<T>>,
+    named_tuple: Enum2<Enum1<T>>,
+    named_named: Enum2<Enum1<T>>,
 }
 
 #[test]
 fn complex() {
-    super::test_with_deps(
-        S2 {
-            fe: vec![E::Unit, E::Newtype(0), E::Tuple(0, 0), E::Named { u8: 0 }],
-            fs: vec![S {
-                e1: vec![E::Unit, E::Newtype(0), E::Tuple(0, 0), E::Named { u8: 0 }],
-                e2: vec![E::Unit, E::Newtype(0), E::Tuple(0, 0), E::Named { u8: 0 }],
-            }],
-            fe2: vec![E2::E2e(vec![
-                E::Unit,
-                E::Newtype(0),
-                E::Tuple(0, 0),
-                E::Named { u8: 0 },
-            ])],
+    super::test_json_with_deps(
+        Struct {
+            unit: Enum1::Unit1,
+            newtype: Enum1::Newtype1(vec![1, 2, 3, 4]),
+            tuple: Enum1::Tuple1(vec![1, 2, 3, 4], vec![1, 2, 3, 4]),
+            named: Enum1::Named1 {
+                t: vec![1, 2, 3, 4],
+            },
+            named_unit: Enum2::Named2 { t: Enum1::Unit1 },
+            named_newtype: Enum2::Named2 {
+                t: Enum1::Newtype1(vec![1, 2, 3, 4]),
+            },
+            named_tuple: Enum2::Named2 {
+                t: Enum1::Tuple1(vec![1, 2, 3, 4], vec![1, 2, 3, 4]),
+            },
+            named_named: Enum2::Named2 {
+                t: Enum1::Named1 {
+                    t: vec![1, 2, 3, 4],
+                },
+            },
         },
-        &::std::format!(
+        &format!(
             "\
 {}
 
@@ -59,23 +65,13 @@ fn complex() {
 {}
 
 {}
-
-{}
-
-{}
-
-{}
-
 ",
-            E::elm_definition().unwrap(),
-            S::elm_definition().unwrap(),
-            E2::elm_definition().unwrap(),
-            E::encoder_definition().unwrap(),
-            S::encoder_definition().unwrap(),
-            E2::encoder_definition().unwrap(),
-            E::decoder_definition().unwrap(),
-            S::decoder_definition().unwrap(),
-            E2::decoder_definition().unwrap(),
+            Enum1::<Vec<usize>>::elm_definition().unwrap(),
+            Enum1::<Vec<usize>>::encoder_definition().unwrap(),
+            Enum1::<Vec<usize>>::decoder_definition().unwrap(),
+            Enum2::<Enum1<Vec<usize>>>::elm_definition().unwrap(),
+            Enum2::<Enum1<Vec<usize>>>::encoder_definition().unwrap(),
+            Enum2::<Enum1<Vec<usize>>>::decoder_definition().unwrap(),
         ),
     )
 }

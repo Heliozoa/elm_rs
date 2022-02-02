@@ -11,8 +11,9 @@ resolver = "2"
 proc-macro = true
 
 [features]
-serde = []
 json = []
+query = []
+serde = []
 
 [dependencies]
 heck = "0.4.0"
