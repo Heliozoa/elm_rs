@@ -1,10 +1,16 @@
 [package]
 name = "elm_rs"
 version = "0.1.0"
-edition = "2021"
 authors = ["Heliozoa <daniel.x.martinez@helsinki.fi>"]
-license = "MIT OR Apache-2.0"
+edition = "2021"
+rust-version = "1.56"
+description = "Generate Elm bindings for your Rust types"
 readme = "../README.md"
+repository = "https://github.com/Heliozoa/elm_rs"
+license = "MIT OR Apache-2.0"
+keywords = ["elm", "bindings"]
+categories = ["development-tools::ffi", "web-programming"]
+exclude = ["src/test", "examples"]
 resolver = "2"
 
 [features]

@@ -147,7 +147,7 @@ fn run_repl(input: &str) -> String {
     println!("{}", input);
     let mut cmd = Command::new("elm")
         .arg("repl")
-        .current_dir("elm-test")
+        .current_dir("../elm-test")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

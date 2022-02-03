@@ -1,10 +1,15 @@
 [package]
 name = "elm_rs_derive"
 version = "0.1.0"
-edition = "2021"
 authors = ["Heliozoa <daniel.x.martinez@helsinki.fi>"]
-license = "MIT OR Apache-2.0"
+edition = "2021"
+rust-version = "1.56"
+description = "Derive macros for elm_rs"
 readme = "../README.md"
+repository = "https://github.com/Heliozoa/elm_rs"
+license = "MIT OR Apache-2.0"
+keywords = []
+categories = []
 resolver = "2"
 
 [lib]
