@@ -50,7 +50,6 @@ macro_rules! export {
 module {} exposing (..)
 
 import Dict exposing (Dict)
-import File
 import Http
 import Json.Decode
 import Json.Encode
