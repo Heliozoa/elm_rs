@@ -16,6 +16,7 @@ resolver = "2"
 proc-macro = true
 
 [features]
+default = []
 json = []
 query = []
 serde = []

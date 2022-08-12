@@ -9,13 +9,13 @@ use crate::{EnumVariantKind, Intermediate, TypeInfo};
 
 pub fn derive(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
-    let intermediate = match super::derive_input_to_intermediate(derive_input) {
+    let intermediate = match Intermediate::parse(derive_input) {
         Ok(intermediate) => intermediate,
-        Err(err) => return err.to_compile_error().into(),
+        Err(err) => return TokenStream::from(err.to_compile_error()),
     };
     let token_stream = match intermediate_to_token_stream(intermediate) {
         Ok(token_stream) => token_stream,
-        Err(err) => return err.to_compile_error().into(),
+        Err(err) => return TokenStream::from(err.to_compile_error()),
     };
     TokenStream::from(token_stream)
 }
@@ -27,6 +27,7 @@ fn intermediate_to_token_stream(
         mut generics,
         generics_without_bounds,
         type_info,
+        container_attributes,
     }: Intermediate,
 ) -> Result<TokenStream2, syn::Error> {
     let ts = match type_info {
@@ -35,7 +36,7 @@ fn intermediate_to_token_stream(
             for field in fields {
                 let ty = &field.ty;
                 let field_name = field.name_elm();
-                let field_name_serialize = field.name_serialize();
+                let field_name_serialize = field.name_serialize(&container_attributes);
                 query_fields.push(
                     quote! {::std::format!("{query_type} \"{field_name_serialize}\" {field_value}",
                         query_type = <#ty as ::elm_rs::ElmQueryField>::field_type(),
@@ -71,7 +72,7 @@ urlEncode{elm_type} struct =
                     for field in fields {
                         let ty = &field.ty;
                         let field_name = field.name_elm();
-                        let field_name_serialize = field.name_serialize();
+                        let field_name_serialize = field.name_serialize(&container_attributes);
                         query_fields.push(
                             quote! {::std::format!("{query_type} \"{field_name_serialize}\" {field_value}",
                                 query_type = <#ty as ::elm_rs::ElmQueryField>::field_type(),

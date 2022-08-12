@@ -8,7 +8,7 @@ use syn::{parse_macro_input, DeriveInput, Type};
 
 pub fn derive(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
-    let intermediate = match super::derive_input_to_intermediate(derive_input) {
+    let intermediate = match Intermediate::parse(derive_input) {
         Ok(intermediate) => intermediate,
         Err(err) => return err.to_compile_error().into(),
     };
@@ -23,6 +23,7 @@ fn intermediate_to_token_stream(
         mut generics,
         generics_without_bounds,
         type_info,
+        container_attributes: _,
     }: Intermediate,
 ) -> TokenStream2 {
     let type_definition = match type_info {

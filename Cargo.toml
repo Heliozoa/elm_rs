@@ -4,3 +4,8 @@ members = [
     "elm_rs_derive"
 ]
 resolver = "2"
+
+
+[patch.crates-io]
+elm_rs = { path = "elm_rs" }
+elm_rs_derive = { path = "elm_rs_derive" }

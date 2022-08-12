@@ -7,15 +7,31 @@ mod json;
 #[cfg(feature = "query")]
 mod query;
 
-use self::attributes::*;
+use self::attributes::{ContainerAttributes, FieldAttributes, VariantAttributes};
 use heck::{ToLowerCamelCase, ToPascalCase};
 use proc_macro::TokenStream;
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream as TokenStream2};
+use quote::ToTokens;
 use std::borrow::Cow;
 use syn::{
     punctuated::Punctuated, spanned::Spanned, Data, DataEnum, DeriveInput, Fields, FieldsNamed,
     Generics, Ident, Type, Variant,
 };
+
+macro_rules! feature_or_default {
+    {
+        $feature:literal => $feature_ex:expr
+    } => {{
+        #[cfg(feature = $feature)]
+        {
+            $feature_ex
+        }
+        #[cfg(not(feature = $feature))]
+        {
+            Default::default()
+        }
+    }};
+}
 
 /// Derive `Elm`.
 #[proc_macro_derive(Elm)]
@@ -44,6 +60,29 @@ struct Intermediate {
     generics: Generics,
     generics_without_bounds: Generics,
     type_info: TypeInfo,
+    container_attributes: ContainerAttributes,
+}
+
+impl Intermediate {
+    // parses the input to an intermediate representation that's convenient to turn into the end result
+    fn parse(input: DeriveInput) -> Result<Self, syn::Error> {
+        let container_attributes = ContainerAttributes::parse(&input.attrs);
+        let type_info = TypeInfo::parse(input.data, &container_attributes)?;
+
+        let elm_type = input.ident.to_string().to_pascal_case();
+        let mut generics_without_bounds = input.generics.clone();
+        for p in generics_without_bounds.type_params_mut() {
+            p.bounds = Punctuated::default();
+        }
+        Ok(Self {
+            ident: input.ident,
+            elm_type,
+            generics: input.generics,
+            generics_without_bounds,
+            type_info,
+            container_attributes,
+        })
+    }
 }
 
 enum TypeInfo {
@@ -61,19 +100,74 @@ enum TypeInfo {
     //     Variant,
     // }
     Enum {
-        representation: EnumRepresentation,
         variants: Vec<EnumVariant>,
+        #[cfg(feature = "serde")]
+        representation: attributes::serde::EnumRepresentation,
     },
+}
+
+impl TypeInfo {
+    pub fn parse(
+        data: Data,
+        container_attributes: &ContainerAttributes,
+    ) -> Result<Self, syn::Error> {
+        let type_info = match data {
+            Data::Struct(data_struct) => match data_struct.fields {
+                Fields::Unit => TypeInfo::Unit,
+                Fields::Unnamed(unnamed) => {
+                    if unnamed.unnamed.len() == 1 {
+                        TypeInfo::Newtype(Box::new(unnamed.unnamed.into_iter().next().unwrap().ty))
+                    } else {
+                        TypeInfo::Tuple(unnamed.unnamed.into_iter().map(|field| field.ty).collect())
+                    }
+                }
+                Fields::Named(named) => {
+                    let transparent = feature_or_default! {
+                        "serde" => container_attributes.serde.transparent
+                    };
+                    if transparent && named.named.len() == 1 {
+                        TypeInfo::Newtype(Box::new(named.named.into_iter().next().unwrap().ty))
+                    } else {
+                        TypeInfo::Struct(StructField::parse(named))
+                    }
+                }
+            },
+            Data::Enum(DataEnum { variants, .. }) => {
+                if variants.is_empty() {
+                    return Err(syn::Error::new(
+                        variants.span(),
+                        "empty enums are not supported",
+                    ));
+                }
+                let variants = variants
+                    .into_iter()
+                    .map(EnumVariant::parse)
+                    .collect::<Result<_, _>>()?;
+
+                TypeInfo::Enum {
+                    #[cfg(feature = "serde")]
+                    representation: container_attributes.serde.enum_representation.clone(),
+                    variants,
+                }
+            }
+            Data::Union(union) => {
+                return Err(syn::Error::new(
+                    union.union_token.span(),
+                    "unions are not supported",
+                ))
+            }
+        };
+        Ok(type_info)
+    }
 }
 
 struct StructField {
     ident: Ident,
-    rename: Option<Rename>,
-    rename_deserialize: Option<Rename>,
-    rename_serialize: Option<Rename>,
     // todo
     // aliases: Vec<String>,
-    ty: Type,
+    ty: TokenStream2,
+    #[cfg(feature = "serde")]
+    serde_attributes: attributes::serde::FieldAttributes,
 }
 
 impl StructField {
@@ -82,64 +176,82 @@ impl StructField {
         self.ident.to_string().to_lower_camel_case()
     }
 
-    /// The name when deserializing from JSON in Elm.
-    /// The name when serializing to JSON in Rust.
-    fn name_deserialize(&'_ self) -> Cow<'_, str> {
-        match &self.rename_deserialize {
-            Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
-            Some(Rename::Field(rename)) => rename.into(),
-            None => match &self.rename {
-                Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
-                Some(Rename::Field(rename)) => rename.into(),
-                None => self.ident.to_string().into(),
-            },
+    #[cfg(feature = "json")]
+    fn name_serialize(&self, container_attributes: &ContainerAttributes) -> String {
+        // explicit rename has priority
+        #[cfg(feature = "serde")]
+        if let Some(rename) = self
+            .serde_attributes
+            .rename
+            .as_ref()
+            .or(self.serde_attributes.rename_serialize.as_ref())
+        {
+            rename.to_string()
+        } else if let Some(rename_all) = container_attributes
+            .serde
+            .rename_all
+            .or(container_attributes.serde.rename_all_serialize)
+        {
+            rename_all.rename_ident(&self.ident)
+        } else {
+            self.ident.to_string()
         }
+        #[cfg(not(feature = "serde"))]
+        self.ident.to_string()
     }
 
-    /// The name when serializing to JSON in Elm.
-    /// The name when deserializing from JSON in Rust.
-    fn name_serialize(&'_ self) -> Cow<'_, str> {
-        match &self.rename_serialize {
-            Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
-            Some(Rename::Field(rename)) => rename.into(),
-            None => match &self.rename {
-                Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
-                Some(Rename::Field(rename)) => rename.into(),
-                None => self.ident.to_string().into(),
-            },
+    #[cfg(feature = "json")]
+    fn name_deserialize(&self, container_attributes: &ContainerAttributes) -> String {
+        // explicit rename has priority
+        #[cfg(feature = "serde")]
+        if let Some(rename) = self
+            .serde_attributes
+            .rename
+            .as_ref()
+            .or(self.serde_attributes.rename_deserialize.as_ref())
+        {
+            rename.to_string()
+        } else if let Some(rename_all) = container_attributes
+            .serde
+            .rename_all
+            .or(container_attributes.serde.rename_all_deserialize)
+        {
+            rename_all.rename_ident(&self.ident)
+        } else {
+            self.ident.to_string()
         }
+        #[cfg(not(feature = "serde"))]
+        self.ident.to_string()
     }
-}
 
-enum Rename {
-    Container(RenameAll),
-    Field(String),
+    fn parse(fields: FieldsNamed) -> Vec<Self> {
+        let fields = fields.named.into_iter().map(|field| {
+            let field_attributes = FieldAttributes::parse(&field.attrs);
+            (field, field_attributes)
+        });
+        #[cfg(feature = "serde")]
+        let fields = fields.filter(|(_, field_attributes)| !field_attributes.serde.skip);
+        fields
+            .map(|(field, field_attributes)| {
+                StructField {
+                    ident: field.ident.unwrap(), // only tuple struct fields are unnamed
+                    // todo
+                    // aliases: field_attributes.serde.aliases,
+                    ty: field.ty.to_token_stream(),
+                    #[cfg(feature = "serde")]
+                    serde_attributes: field_attributes.serde,
+                }
+            })
+            .collect()
+    }
 }
 
 struct EnumVariant {
     ident: Ident,
-    rename: Option<Rename>,
-    // corresponds to serde's rename serialize
-    rename_deserialize: Option<Rename>,
-    // corresponds to serde's rename deserialize
-    rename_serialize: Option<Rename>,
-    skip: bool,
-    other: bool,
     variant: EnumVariantKind,
     span: Span,
-}
-
-pub(crate) enum EnumRepresentation {
-    External,
-    Internal { tag: String },
-    Adjacent { tag: String, content: String },
-    Untagged,
-}
-
-impl Default for EnumRepresentation {
-    fn default() -> Self {
-        Self::External
-    }
+    #[cfg(feature = "serde")]
+    serde_attributes: attributes::serde::VariantAttributes,
 }
 
 impl EnumVariant {
@@ -148,32 +260,85 @@ impl EnumVariant {
         self.ident.to_string().to_pascal_case().into()
     }
 
-    /// The name when deserializing from JSON in Elm.
-    /// The name when serializing to JSON in Rust.
-    fn name_deserialize(&'_ self) -> Cow<'_, str> {
-        match &self.rename_deserialize {
-            Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
-            Some(Rename::Field(rename)) => rename.into(),
-            None => match &self.rename {
-                Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
-                Some(Rename::Field(rename)) => rename.into(),
-                None => self.ident.to_string().into(),
-            },
+    #[cfg(feature = "json")]
+    fn name_serialize(&self, container_attributes: &ContainerAttributes) -> String {
+        // explicit rename has priority
+        #[cfg(feature = "serde")]
+        if let Some(rename) = self
+            .serde_attributes
+            .rename
+            .as_ref()
+            .or(self.serde_attributes.rename_serialize.as_ref())
+        {
+            rename.clone()
+        } else if let Some(rename_all) = container_attributes
+            .serde
+            .rename_all
+            .or(container_attributes.serde.rename_all_serialize)
+        {
+            rename_all.rename_ident(&self.ident)
+        } else {
+            self.ident.to_string()
         }
+        #[cfg(not(feature = "serde"))]
+        self.ident.to_string()
     }
 
-    /// The name when serializing to JSON in Elm.
-    /// The name when deserializing from JSON in Rust.
-    fn name_serialize(&'_ self) -> Cow<'_, str> {
-        match &self.rename_serialize {
-            Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
-            Some(Rename::Field(rename)) => rename.into(),
-            None => match &self.rename {
-                Some(Rename::Container(rename_all)) => rename_all.rename_ident(&self.ident).into(),
-                Some(Rename::Field(rename)) => rename.into(),
-                None => self.ident.to_string().into(),
-            },
+    #[cfg(feature = "json")]
+    fn name_deserialize(&self, container_attributes: &ContainerAttributes) -> String {
+        // explicit rename has priority
+        #[cfg(feature = "serde")]
+        if let Some(rename) = self
+            .serde_attributes
+            .rename
+            .as_ref()
+            .or(self.serde_attributes.rename_deserialize.as_ref())
+        {
+            rename.to_string()
+        } else if let Some(rename_all) = container_attributes
+            .serde
+            .rename_all
+            .or(container_attributes.serde.rename_all_deserialize)
+        {
+            rename_all.rename_ident(&self.ident)
+        } else {
+            self.ident.to_string()
         }
+        #[cfg(not(feature = "serde"))]
+        self.ident.to_string()
+    }
+
+    fn parse(variant: Variant) -> Result<Self, syn::Error> {
+        let span = variant.span();
+        let variant_attributes = VariantAttributes::parse(&variant.attrs);
+        let variant_kind = match variant.fields {
+            Fields::Unit => EnumVariantKind::Unit,
+            Fields::Unnamed(unnamed) if unnamed.unnamed.len() == 1 => EnumVariantKind::Newtype(
+                unnamed
+                    .unnamed
+                    .into_iter()
+                    .next()
+                    .unwrap()
+                    .ty
+                    .to_token_stream(),
+            ),
+            Fields::Unnamed(unnamed) => EnumVariantKind::Tuple(
+                unnamed
+                    .unnamed
+                    .into_iter()
+                    .map(|field| field.ty.to_token_stream())
+                    .collect(),
+            ),
+            Fields::Named(named) => EnumVariantKind::Struct(StructField::parse(named)),
+        };
+        let variant = EnumVariant {
+            ident: variant.ident,
+            variant: variant_kind,
+            span,
+            #[cfg(feature = "serde")]
+            serde_attributes: variant_attributes.serde,
+        };
+        Ok(variant)
     }
 }
 
@@ -183,183 +348,15 @@ enum EnumVariantKind {
     Unit,
     // Variant(String),
     // {"Variant": "string"}
-    Newtype(Box<Type>),
+    Newtype(TokenStream2), // e.g. Vec<i32>
     // Variant(String, u32),
     // {"Variant": []}
     // {"Variant": ["string", 0]}
-    Tuple(Vec<Type>),
+    Tuple(Vec<TokenStream2>), // e.g. [Vec<i32>, String]
     // Variant {
     //     s: String,
     // }
     // {}
     // {"s": "string"}
     Struct(Vec<StructField>),
-}
-
-// parses the input to an intermediate representation that's convenient to turn into the end result
-fn derive_input_to_intermediate(input: DeriveInput) -> Result<Intermediate, syn::Error> {
-    let container_attributes = parse_container_attributes(&input.attrs);
-    let type_info = parse_type_info(input.data, container_attributes)?;
-
-    let elm_type = input.ident.to_string().to_pascal_case();
-    let mut generics_without_bounds = input.generics.clone();
-    for p in generics_without_bounds.type_params_mut() {
-        p.bounds = Punctuated::default();
-    }
-    Ok(Intermediate {
-        ident: input.ident,
-        elm_type,
-        generics: input.generics,
-        generics_without_bounds,
-        type_info,
-    })
-}
-
-fn parse_type_info(
-    data: Data,
-    container_attributes: ContainerAttributes,
-) -> Result<TypeInfo, syn::Error> {
-    let type_info = match data {
-        Data::Struct(data_struct) => match data_struct.fields {
-            Fields::Unit => TypeInfo::Unit,
-            Fields::Unnamed(mut unnamed) => {
-                if unnamed.unnamed.len() == 1 {
-                    TypeInfo::Newtype(Box::new(unnamed.unnamed.pop().unwrap().into_value().ty))
-                } else {
-                    TypeInfo::Tuple(unnamed.unnamed.into_iter().map(|field| field.ty).collect())
-                }
-            }
-            Fields::Named(mut named) => {
-                if container_attributes.serde_transparent && named.named.len() == 1 {
-                    TypeInfo::Newtype(Box::new(named.named.pop().unwrap().into_value().ty))
-                } else {
-                    TypeInfo::Struct(fields_named_to_struct_fields(named, &container_attributes))
-                }
-            }
-        },
-        Data::Enum(DataEnum { variants, .. }) => {
-            if variants.is_empty() {
-                return Err(syn::Error::new(
-                    variants.span(),
-                    "empty enums are not supported",
-                ));
-            }
-            let variants = variants
-                .into_iter()
-                .map(|variant| parse_enum_variant(variant, &container_attributes))
-                .collect::<Result<_, _>>()?;
-
-            TypeInfo::Enum {
-                representation: container_attributes.serde_enum_representation,
-                variants,
-            }
-        }
-        Data::Union(union) => {
-            return Err(syn::Error::new(
-                union.union_token.span(),
-                "unions are not supported",
-            ))
-        }
-    };
-    Ok(type_info)
-}
-
-fn parse_enum_variant(
-    variant: Variant,
-    container_attributes: &ContainerAttributes,
-) -> Result<EnumVariant, syn::Error> {
-    let span = variant.span();
-    let variant_attributes = parse_variant_attributes(&variant.attrs);
-    let variant_kind = match variant.fields {
-        Fields::Unit => EnumVariantKind::Unit,
-        Fields::Unnamed(mut unnamed) if unnamed.unnamed.len() == 1 => {
-            EnumVariantKind::Newtype(Box::new(unnamed.unnamed.pop().unwrap().into_value().ty))
-        }
-        Fields::Unnamed(unnamed) => {
-            EnumVariantKind::Tuple(unnamed.unnamed.into_iter().map(|field| field.ty).collect())
-        }
-        Fields::Named(named) => {
-            EnumVariantKind::Struct(fields_named_to_struct_fields(named, container_attributes))
-        }
-    };
-    let variant = EnumVariant {
-        ident: variant.ident,
-        rename: variant_attributes
-            .serde_rename
-            .map(Rename::Field)
-            .or_else(|| variant_attributes.serde_rename_all.map(Rename::Container))
-            .or_else(|| container_attributes.serde_rename_all.map(Rename::Container)),
-        rename_deserialize: variant_attributes
-            .serde_rename_serialize
-            .map(Rename::Field)
-            .or_else(|| {
-                variant_attributes
-                    .serde_rename_all_serialize
-                    .map(Rename::Container)
-            })
-            .or_else(|| {
-                container_attributes
-                    .serde_rename_all_serialize
-                    .map(Rename::Container)
-            }),
-        rename_serialize: variant_attributes
-            .serde_rename_deserialize
-            .map(Rename::Field)
-            .or_else(|| {
-                variant_attributes
-                    .serde_rename_all_deserialize
-                    .map(Rename::Container)
-            })
-            .or_else(|| {
-                container_attributes
-                    .serde_rename_all_deserialize
-                    .map(Rename::Container)
-            }),
-        skip: variant_attributes.serde_skip,
-        other: variant_attributes.serde_other,
-        variant: variant_kind,
-        span,
-    };
-    Ok(variant)
-}
-
-fn fields_named_to_struct_fields(
-    named: FieldsNamed,
-    container_attributes: &ContainerAttributes,
-) -> Vec<StructField> {
-    named
-        .named
-        .into_iter()
-        .map(|field| {
-            let field_attributes = parse_field_attributes(&field.attrs);
-            (field, field_attributes)
-        })
-        .filter(|(_, field_attributes)| !field_attributes.serde_skip)
-        .map(|(field, field_attributes)| StructField {
-            ident: field.ident.unwrap(),
-            rename: field_attributes
-                .serde_rename
-                .map(Rename::Field)
-                .or_else(|| container_attributes.serde_rename_all.map(Rename::Container)),
-            rename_deserialize: field_attributes
-                .serde_rename_serialize
-                .map(Rename::Field)
-                .or_else(|| {
-                    container_attributes
-                        .serde_rename_all_serialize
-                        .map(Rename::Container)
-                }),
-            rename_serialize: field_attributes
-                .serde_rename_deserialize
-                .map(Rename::Field)
-                .or_else(|| {
-                    container_attributes
-                        .serde_rename_all_deserialize
-                        .map(Rename::Container)
-                }),
-            // todo
-            // aliases: field_attributes.serde_aliases,
-            ty: field.ty,
-        })
-        .collect()
 }
