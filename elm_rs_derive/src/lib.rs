@@ -4,10 +4,10 @@ mod attributes;
 mod elm;
 #[cfg(feature = "json")]
 mod elm_deserialize;
+#[cfg(feature = "query")]
+mod elm_query;
 #[cfg(feature = "json")]
 mod elm_serialize;
-#[cfg(feature = "query")]
-mod query;
 
 use self::attributes::{ContainerAttributes, FieldAttributes, VariantAttributes};
 use heck::{ToLowerCamelCase, ToPascalCase};
@@ -44,7 +44,7 @@ pub fn derive_elm_deserialize(input: TokenStream) -> TokenStream {
 #[cfg(feature = "query")]
 #[proc_macro_derive(ElmQuery)]
 pub fn derive_elm_query(input: TokenStream) -> TokenStream {
-    query::derive(input)
+    elm_query::derive(input)
 }
 
 /// Intermediate representation of the derive input for more convenient handling.

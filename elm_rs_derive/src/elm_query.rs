@@ -118,7 +118,7 @@ urlEncode{elm_type} enum =
         _ => {
             return Err(syn::Error::new(
                 ident.span(),
-                "Only structs and enums are allowed",
+                "only structs and enums are allowed",
             ))
         }
     };
@@ -126,7 +126,7 @@ urlEncode{elm_type} enum =
     for p in generics.type_params_mut() {
         p.bounds.push(syn::parse_str("::elm_rs::Elm").unwrap());
         p.bounds
-            .push(syn::parse_str("::elm_rs::ElmEncode").unwrap());
+            .push(syn::parse_str("::elm_rs::ElmQueryField").unwrap());
     }
 
     let res = quote! {
