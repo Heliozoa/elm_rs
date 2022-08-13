@@ -663,7 +663,7 @@ fn enum_variant_struct_external(
     let constructor = constructor(variant_name, &field_names);
 
     let decoder = quote! {::std::format!("\
-    Json.Decode.field \"{variant_name_deserialize}\" (Json.Decode.succeed construct{variant_name} {decoders})",
+    Json.Decode.field \"{variant_name_deserialize}\" (Json.Decode.succeed elmRsConstruct{variant_name} {decoders})",
             variant_name = #variant_name,
             variant_name_deserialize = #variant_name_deserialize,
             decoders = (
@@ -732,7 +732,7 @@ fn enum_variant_struct_internal(
 
     let decoder = quote! {::std::format!("\
                     \"{variant_name_deserialize}\" ->
-                        Json.Decode.succeed construct{variant_name} {decoders}",
+                        Json.Decode.succeed elmRsConstruct{variant_name} {decoders}",
             variant_name = #variant_name,
             variant_name_deserialize = #variant_name_deserialize,
             decoders = (
@@ -838,7 +838,7 @@ fn enum_variant_struct_adjacent(
     }
     let decoder = quote! {::std::format!("\
 \"{variant_name_deserialize}\" ->
-                        Json.Decode.field \"{content}\" (Json.Decode.succeed construct{variant_name} {field_decoders})",
+                        Json.Decode.field \"{content}\" (Json.Decode.succeed elmRsConstruct{variant_name} {field_decoders})",
         variant_name = #variant_name,
         variant_name_deserialize = #variant_name_deserialize,
         content = #content,
@@ -929,7 +929,7 @@ fn enum_variant_struct_untagged(
         .map(|field| field.name_deserialize(container_attributes));
     let constructor = constructor(variant_name, &field_names);
     let decoder = quote! {::std::format!("\
-    Json.Decode.succeed construct{variant_name} {decoders}",
+    Json.Decode.succeed elmRsConstruct{variant_name} {decoders}",
             variant_name = #variant_name,
             decoders = (
                 &[
@@ -950,7 +950,7 @@ fn enum_variant_struct_untagged(
 
 fn constructor(variant_name: &str, field_names: &[String]) -> TokenStream2 {
     quote! {::std::format!("\
-construct{enum_variant} {fields} =
+elmRsConstruct{enum_variant} {fields} =
                         {enum_variant} {{ {setters} }}",
         enum_variant = #variant_name,
         fields = (

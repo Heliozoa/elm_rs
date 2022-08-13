@@ -140,7 +140,7 @@ drawingDecoder =
 - `uuid`: Trait implementations for uuid types. (`uuid v1`)
 
 ### Serde compatibility
-The `with-serde` feature enables compatibility with serde attributes. Currently the following attributes are supported:
+The `serde` feature enables compatibility with serde attributes. Currently the following attributes are supported:
 #### Container attributes
 - rename_all
 - tag
