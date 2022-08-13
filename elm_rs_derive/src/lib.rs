@@ -20,21 +20,6 @@ use syn::{
     Generics, Ident, Type, Variant,
 };
 
-macro_rules! feature_or_default {
-    {
-        $feature:literal => $feature_ex:expr
-    } => {{
-        #[cfg(feature = $feature)]
-        {
-            $feature_ex
-        }
-        #[cfg(not(feature = $feature))]
-        {
-            Default::default()
-        }
-    }};
-}
-
 /// Derive `Elm`.
 #[proc_macro_derive(Elm)]
 pub fn derive_elm(input: TokenStream) -> TokenStream {
@@ -131,9 +116,10 @@ impl TypeInfo {
                     }
                 }
                 Fields::Named(named) => {
-                    let transparent = feature_or_default! {
-                        "serde" => container_attributes.serde.transparent
-                    };
+                    #[cfg(not(feature = "serde"))]
+                    let transparent = false;
+                    #[cfg(feature = "serde")]
+                    let transparent = container_attributes.serde.transparent;
                     if transparent && named.named.len() == 1 {
                         TypeInfo::Newtype(Box::new(named.named.into_iter().next().unwrap().ty))
                     } else {

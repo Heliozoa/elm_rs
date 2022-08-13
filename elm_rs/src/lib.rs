@@ -39,10 +39,18 @@ pub use self::{
 /// }
 ///
 /// let mut file = std::fs::File::create("Bindings.elm").unwrap();
-/// elm_rs::export!("Bindings", &mut file, Filetype, Drawing).unwrap();
+/// elm_rs::export!("Bindings", &mut file, {
+///     both: [Filetype, Drawing], // generates both Elm encoders and decoders
+///     encoders: [], // generates only Elm encoders
+///     decoders: [], // you can leave any of these sections out if you don't have anything to put there
+/// }).unwrap();
 /// ```
 macro_rules! export {
-    ($name: expr, $target: expr $(, $json: ty)*) => {
+    ($name: expr, $target: expr, {
+        $(both:  [$($code: ty),*  $(,)?])? $(,)?
+        $(encoders:  [$($encode: ty),*  $(,)?])? $(,)?
+        $(decoders: [$($decode: ty),*  $(,)?])? $(,)?
+    }) => {
         {
             fn _export(name: &::std::primitive::str, target: &mut impl ::std::io::Write) -> ::std::result::Result<(), ::std::io::Error> {
                 ::std::writeln!(target, r#"
@@ -68,17 +76,33 @@ import Url.Builder
     <::std::result::Result::<(), ()> as $crate::ElmDecode>::decoder_definition().unwrap(),
     <::std::result::Result::<(), ()> as $crate::ElmEncode>::encoder_definition().unwrap(),
 )?;
-                $(
-                    if let ::std::option::Option::Some(elm_definition) = <$json as $crate::Elm>::elm_definition() {
+                $($(
+                    if let ::std::option::Option::Some(elm_definition) = <$code as $crate::Elm>::elm_definition() {
                         ::std::writeln!(target, "{}\n", elm_definition)?;
                     }
-                    if let ::std::option::Option::Some(encoder_definition) = <$json as $crate::ElmEncode>::encoder_definition() {
+                    if let ::std::option::Option::Some(encoder_definition) = <$code as $crate::ElmEncode>::encoder_definition() {
                         ::std::writeln!(target, "{}\n", encoder_definition)?;
                     }
-                    if let ::std::option::Option::Some(decoder_definition) = <$json as $crate::ElmDecode>::decoder_definition() {
+                    if let ::std::option::Option::Some(decoder_definition) = <$code as $crate::ElmDecode>::decoder_definition() {
                         ::std::writeln!(target, "{}\n", decoder_definition)?;
                     }
-                )*
+                )*)?
+                $($(
+                    if let ::std::option::Option::Some(elm_definition) = <$encode as $crate::Elm>::elm_definition() {
+                        ::std::writeln!(target, "{}\n", elm_definition)?;
+                    }
+                    if let ::std::option::Option::Some(encoder_definition) = <$encode as $crate::ElmEncode>::encoder_definition() {
+                        ::std::writeln!(target, "{}\n", encoder_definition)?;
+                    }
+                )*)?
+                $($(
+                    if let ::std::option::Option::Some(elm_definition) = <$decode as $crate::Elm>::elm_definition() {
+                        ::std::writeln!(target, "{}\n", elm_definition)?;
+                    }
+                    if let ::std::option::Option::Some(decoder_definition) = <$decode as $crate::ElmDecode>::decoder_definition() {
+                        ::std::writeln!(target, "{}\n", decoder_definition)?;
+                    }
+                )*)?
                 ::std::result::Result::Ok(())
             }
             _export($name, $target)

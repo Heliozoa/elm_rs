@@ -5,7 +5,7 @@ use crate::Elm;
 #[cfg(feature = "derive")]
 pub use elm_rs_derive::ElmEncode;
 
-/// Used to generate JSON encoders and decoders for our Rust types in Elm.
+/// Used to generate JSON encoders for our Rust types in Elm.
 pub trait ElmEncode {
     /// The name of the encoder in Elm.
     fn encoder_type() -> String;
