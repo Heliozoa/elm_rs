@@ -1,7 +1,7 @@
-use crate::{Elm, ElmJson};
+use crate::{Elm, ElmDecode, ElmEncode};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Elm, ElmJson, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Elm, ElmEncode, ElmDecode, Serialize, Deserialize, PartialEq)]
 enum Enum1<T> {
     Unit1,
     Newtype1(T),
@@ -9,7 +9,7 @@ enum Enum1<T> {
     Named1 { t: T },
 }
 
-#[derive(Debug, Elm, ElmJson, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Elm, ElmEncode, ElmDecode, Serialize, Deserialize, PartialEq)]
 enum Enum2<T> {
     Unit2,
     Newtype2(T),
@@ -17,7 +17,7 @@ enum Enum2<T> {
     Named2 { t: T },
 }
 
-#[derive(Debug, Elm, ElmJson, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Elm, ElmEncode, ElmDecode, Serialize, Deserialize, PartialEq)]
 struct Struct<T> {
     unit: Enum1<T>,
     newtype: Enum1<T>,

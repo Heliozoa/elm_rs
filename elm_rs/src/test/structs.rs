@@ -1,16 +1,16 @@
-use crate::{Elm, ElmJson};
+use crate::{Elm, ElmDecode, ElmEncode};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 struct Unit;
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 struct Newtype(i32);
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 struct Tuple(i32, i32);
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 struct Named {
     first: i32,
     second: String,

@@ -1,24 +1,24 @@
-use crate::{Elm, ElmJson};
+use crate::{Elm, ElmDecode, ElmEncode};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 #[serde(transparent)]
 struct TransparentNamed {
     field: u8,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 #[serde(transparent)]
 struct TransparentNewtype(u8);
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 enum Other {
     A,
     #[serde(other)]
     B,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 #[serde(rename_all = "UPPERCASE")]
 struct RenameStruct {
     uppercase: u8,
@@ -30,19 +30,19 @@ struct RenameStruct {
     rename_for_deserialization: u8,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 #[serde(rename_all = "UPPERCASE")]
 enum RenameEnum {
     Uppercase,
     #[serde(rename = "another-variant")]
     Renamed,
-    #[serde(rename(deserialize = "se"))]
+    #[serde(rename(serialize = "se"))]
     RenameForSerialization,
-    #[serde(rename(serialize = "de"))]
+    #[serde(rename(deserialize = "de"))]
     RenameForDeserialization,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 struct Skip {
     #[serde(skip)]
     skipped: u8,

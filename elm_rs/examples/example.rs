@@ -1,14 +1,14 @@
 #![allow(dead_code)]
 
-use elm_rs::{Elm, ElmJson};
+use elm_rs::{Elm, ElmDecode, ElmEncode};
 
-#[derive(Elm, ElmJson)]
+#[derive(Elm, ElmEncode, ElmDecode)]
 enum Filetype {
     Jpeg,
     Png,
 }
 
-#[derive(Elm, ElmJson)]
+#[derive(Elm, ElmEncode, ElmDecode)]
 struct Drawing {
     title: String,
     authors: Vec<String>,

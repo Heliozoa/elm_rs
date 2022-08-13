@@ -16,7 +16,7 @@ resolver = "2"
 [features]
 default = ["derive"]
 derive = ["elm_rs_derive", "elm_rs_derive/json", "elm_rs_derive/query"]
-with-serde = ["elm_rs_derive/json", "elm_rs_derive/serde"]
+serde = ["elm_rs_derive/json", "elm_rs_derive/serde"]
 
 [dependencies]
 elm_rs_derive = { version = "0.1.0", optional = true }

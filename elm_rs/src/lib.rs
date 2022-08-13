@@ -1,8 +1,9 @@
 #![doc = include_str!("../../README.md")]
 
+mod deserialize;
 mod elm;
-mod json;
 mod query;
+mod serialize;
 #[cfg(test)]
 mod test;
 
@@ -10,9 +11,10 @@ mod test;
 extern crate self as elm_rs;
 
 pub use self::{
+    deserialize::ElmDecode,
     elm::Elm,
-    json::ElmJson,
     query::{ElmQuery, ElmQueryField},
+    serialize::ElmEncode,
 };
 
 #[macro_export]
@@ -20,15 +22,15 @@ pub use self::{
 ///
 /// # Example
 /// ```no_run
-/// use elm_rs::{Elm, ElmJson};
+/// use elm_rs::{Elm, ElmEncode, ElmDecode};
 ///
-/// #[derive(Elm, ElmJson)]
+/// #[derive(Elm, ElmEncode, ElmDecode)]
 /// enum Filetype {
 ///     Jpeg,
 ///     Png,
 /// }
 ///
-/// #[derive(Elm, ElmJson)]
+/// #[derive(Elm, ElmEncode, ElmDecode)]
 /// struct Drawing {
 ///     title: String,
 ///     authors: Vec<String>,
@@ -63,17 +65,17 @@ import Url.Builder
 
 "#,
     name,
-    <::std::result::Result::<(), ()> as $crate::ElmJson>::decoder_definition().unwrap(),
-    <::std::result::Result::<(), ()> as $crate::ElmJson>::encoder_definition().unwrap(),
+    <::std::result::Result::<(), ()> as $crate::ElmDecode>::decoder_definition().unwrap(),
+    <::std::result::Result::<(), ()> as $crate::ElmEncode>::encoder_definition().unwrap(),
 )?;
                 $(
                     if let ::std::option::Option::Some(elm_definition) = <$json as $crate::Elm>::elm_definition() {
                         ::std::writeln!(target, "{}\n", elm_definition)?;
                     }
-                    if let ::std::option::Option::Some(encoder_definition) = <$json as $crate::ElmJson>::encoder_definition() {
+                    if let ::std::option::Option::Some(encoder_definition) = <$json as $crate::ElmEncode>::encoder_definition() {
                         ::std::writeln!(target, "{}\n", encoder_definition)?;
                     }
-                    if let ::std::option::Option::Some(decoder_definition) = <$json as $crate::ElmJson>::decoder_definition() {
+                    if let ::std::option::Option::Some(decoder_definition) = <$json as $crate::ElmDecode>::decoder_definition() {
                         ::std::writeln!(target, "{}\n", decoder_definition)?;
                     }
                 )*

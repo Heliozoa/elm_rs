@@ -1,19 +1,19 @@
-use crate::{Elm, ElmJson};
+use crate::{Elm, ElmDecode, ElmEncode};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 #[serde(rename = "renamed")]
 struct Unit;
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 #[serde(rename = "renamed")]
 struct Newtype(i32);
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 #[serde(rename = "renamed")]
 struct Tuple(i32, i32);
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 #[serde(rename = "renamed")]
 #[serde(rename_all = "UPPERCASE")]
 struct Named {

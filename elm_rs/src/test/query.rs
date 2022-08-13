@@ -1,7 +1,7 @@
-use crate::{Elm, ElmJson, ElmQuery};
+use crate::{Elm, ElmDecode, ElmEncode, ElmQuery};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson, ElmQuery)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode, ElmQuery)]
 struct Named {
     first: i32,
     second: String,
@@ -18,7 +18,7 @@ fn query_struct() {
     );
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson, ElmQuery)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode, ElmQuery)]
 enum Enum {
     First { first: i32, second: String },
     Second { third: i32, fourth: String },

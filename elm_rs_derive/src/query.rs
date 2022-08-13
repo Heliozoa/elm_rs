@@ -125,7 +125,8 @@ urlEncode{elm_type} enum =
 
     for p in generics.type_params_mut() {
         p.bounds.push(syn::parse_str("::elm_rs::Elm").unwrap());
-        p.bounds.push(syn::parse_str("::elm_rs::ElmJson").unwrap());
+        p.bounds
+            .push(syn::parse_str("::elm_rs::ElmEncode").unwrap());
     }
 
     let res = quote! {

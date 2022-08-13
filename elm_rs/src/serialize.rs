@@ -1,31 +1,19 @@
-//! Contains the `ElmJson` trait.
+//! Contains the `ElmEncode` trait.
 
 use crate::Elm;
 
 #[cfg(feature = "derive")]
-pub use elm_rs_derive::ElmJson;
+pub use elm_rs_derive::ElmEncode;
 
 /// Used to generate JSON encoders and decoders for our Rust types in Elm.
-pub trait ElmJson {
-    /// The name of the decoder in Elm.
-    fn decoder_type() -> String;
-    /// The decoder function in Elm. None for decoders in Json.Decode.
-    fn decoder_definition() -> Option<String>;
+pub trait ElmEncode {
     /// The name of the encoder in Elm.
     fn encoder_type() -> String;
     /// The encoder function in Elm. None for encoders in Json.Encode.
     fn encoder_definition() -> Option<String>;
 }
 
-impl ElmJson for () {
-    fn decoder_type() -> String {
-        "Json.Decode.null ()".to_string()
-    }
-
-    fn decoder_definition() -> Option<String> {
-        None
-    }
-
+impl ElmEncode for () {
     fn encoder_type() -> String {
         r#"(\_ -> Json.Encode.null)"#.to_string()
     }
@@ -35,18 +23,10 @@ impl ElmJson for () {
     }
 }
 
-impl<T> ElmJson for (T,)
+impl<T> ElmEncode for (T,)
 where
-    T: Elm + ElmJson,
+    T: Elm + ElmEncode,
 {
-    fn decoder_type() -> String {
-        ::std::format!("(Json.Decode.index 0 ({}))", T::decoder_type(),)
-    }
-
-    fn decoder_definition() -> Option<String> {
-        None
-    }
-
     fn encoder_type() -> String {
         ::std::format!(
             "\\( a ) -> Json.Encode.list identity [ {} a ]",
@@ -59,23 +39,11 @@ where
     }
 }
 
-impl<T, U> ElmJson for (T, U)
+impl<T, U> ElmEncode for (T, U)
 where
-    T: Elm + ElmJson,
-    U: Elm + ElmJson,
+    T: Elm + ElmEncode,
+    U: Elm + ElmEncode,
 {
-    fn decoder_type() -> String {
-        ::std::format!(
-            "Json.Decode.map2 (\\a b -> ( a, b )) (Json.Decode.index 0 ({})) (Json.Decode.index 1 ({}))",
-            T::decoder_type(),
-            U::decoder_type()
-        )
-    }
-
-    fn decoder_definition() -> Option<String> {
-        None
-    }
-
     fn encoder_type() -> String {
         ::std::format!(
             "\\( a, b) -> Json.Encode.list identity [ {} a, {} b ]",
@@ -89,25 +57,12 @@ where
     }
 }
 
-impl<T, U, V> ElmJson for (T, U, V)
+impl<T, U, V> ElmEncode for (T, U, V)
 where
-    T: Elm + ElmJson,
-    U: Elm + ElmJson,
-    V: Elm + ElmJson,
+    T: Elm + ElmEncode,
+    U: Elm + ElmEncode,
+    V: Elm + ElmEncode,
 {
-    fn decoder_type() -> String {
-        ::std::format!(
-            "Json.Decode.map3 (\\a b c -> ( a, b, c )) (Json.Decode.index 0 ({})) (Json.Decode.index 1 ({})) (Json.Decode.index 2 ({}))",
-            T::decoder_type(),
-            U::decoder_type(),
-            V::decoder_type(),
-        )
-    }
-
-    fn decoder_definition() -> Option<String> {
-        None
-    }
-
     fn encoder_type() -> String {
         ::std::format!(
             "\\( a, b, c ) -> Json.Encode.list identity [ {} a, {} b, {} c ]",
@@ -122,15 +77,7 @@ where
     }
 }
 
-impl<T: Elm + ElmJson + ToOwned + ?Sized> ElmJson for std::borrow::Cow<'_, T> {
-    fn decoder_type() -> String {
-        T::decoder_type()
-    }
-
-    fn decoder_definition() -> Option<String> {
-        T::decoder_definition()
-    }
-
+impl<T: Elm + ElmEncode + ToOwned + ?Sized> ElmEncode for std::borrow::Cow<'_, T> {
     fn encoder_type() -> String {
         T::encoder_type()
     }
@@ -140,18 +87,10 @@ impl<T: Elm + ElmJson + ToOwned + ?Sized> ElmJson for std::borrow::Cow<'_, T> {
     }
 }
 
-impl<T, const U: usize> ElmJson for [T; U]
+impl<T, const U: usize> ElmEncode for [T; U]
 where
-    T: Elm + ElmJson,
+    T: Elm + ElmEncode,
 {
-    fn decoder_type() -> String {
-        <[T]>::decoder_type()
-    }
-
-    fn decoder_definition() -> Option<String> {
-        <[T]>::decoder_definition()
-    }
-
     fn encoder_type() -> String {
         <[T]>::encoder_type()
     }
@@ -161,23 +100,7 @@ where
     }
 }
 
-impl ElmJson for std::time::Duration {
-    fn decoder_type() -> String {
-        "durationDecoder".to_string()
-    }
-
-    fn decoder_definition() -> Option<String> {
-        Some(
-            r#"durationDecoder : Json.Decode.Decoder Duration
-durationDecoder =
-    Json.Decode.succeed Duration
-    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "secs" (Json.Decode.int)))
-    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nanos" (Json.Decode.int)))
-"#
-            .to_string(),
-        )
-    }
-
+impl ElmEncode for std::time::Duration {
     fn encoder_type() -> String {
         "durationEncoder".to_string()
     }
@@ -196,25 +119,7 @@ durationEncoder duration =
     }
 }
 
-impl<T: Elm + ElmJson, E: Elm + ElmJson> ElmJson for Result<T, E> {
-    fn decoder_type() -> String {
-        format!(
-            "resultDecoder ({}) ({})",
-            E::decoder_type(),
-            T::decoder_type()
-        )
-    }
-
-    fn decoder_definition() -> Option<String> {
-        Some(r#"resultDecoder : Json.Decode.Decoder e -> Json.Decode.Decoder t -> Json.Decode.Decoder (Result e t)
-resultDecoder errDecoder okDecoder =
-    Json.Decode.oneOf
-        [ Json.Decode.map Ok (Json.Decode.field "Ok" okDecoder)
-        , Json.Decode.map Err (Json.Decode.field "Err" errDecoder)
-        ]"#
-            .to_string())
-    }
-
+impl<T: Elm + ElmEncode, E: Elm + ElmEncode> ElmEncode for Result<T, E> {
     fn encoder_type() -> String {
         format!(
             "resultEncoder ({}) ({})",
@@ -235,23 +140,7 @@ resultEncoder errEncoder okEncoder enum =
     }
 }
 
-impl ElmJson for std::time::SystemTime {
-    fn decoder_type() -> String {
-        "systemTimeDecoder".to_string()
-    }
-
-    fn decoder_definition() -> Option<String> {
-        Some(
-            r#"systemTimeDecoder : Json.Decode.Decoder SystemTime
-systemTimeDecoder =
-    Json.Decode.succeed SystemTime
-    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "secs_since_epoch" (Json.Decode.int)))
-    |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "nanos_since_epoch" (Json.Decode.int)))
-"#
-            .to_string(),
-        )
-    }
-
+impl ElmEncode for std::time::SystemTime {
     fn encoder_type() -> String {
         "systemTimeEncoder".to_string()
     }
@@ -272,15 +161,7 @@ systemTimeEncoder duration =
 
 macro_rules! impl_builtin {
     ($rust_type: ty, $elm_type: expr, $elm_decoder: expr, $elm_encoder: expr) => {
-        impl ElmJson for $rust_type {
-            fn decoder_type() -> String {
-                $elm_decoder.to_string()
-            }
-
-            fn decoder_definition() -> Option<String> {
-                None
-            }
-
+        impl ElmEncode for $rust_type {
             fn encoder_type() -> String {
                 $elm_encoder.to_string()
             }
@@ -294,15 +175,7 @@ macro_rules! impl_builtin {
 
 macro_rules! impl_builtin_container {
     ($rust_type: ty, $elm_name: expr, $elm_decoder: expr, $elm_encoder: expr) => {
-        impl<T: Elm + ElmJson> ElmJson for $rust_type {
-            fn decoder_type() -> String {
-                ::std::format!("{} ({})", $elm_decoder, T::decoder_type())
-            }
-
-            fn decoder_definition() -> Option<String> {
-                None
-            }
-
+        impl<T: Elm + ElmEncode> ElmEncode for $rust_type {
             fn encoder_type() -> String {
                 ::std::format!("{} ({})", $elm_encoder, T::encoder_type())
             }
@@ -316,15 +189,7 @@ macro_rules! impl_builtin_container {
 
 macro_rules! impl_builtin_map {
     ($rust_type: ty) => {
-        impl<T: Elm + ElmJson> ElmJson for $rust_type {
-            fn decoder_type() -> String {
-                ::std::format!("Json.Decode.dict ({})", T::decoder_type())
-            }
-
-            fn decoder_definition() -> Option<String> {
-                None
-            }
-
+        impl<T: Elm + ElmEncode> ElmEncode for $rust_type {
             fn encoder_type() -> String {
                 ::std::format!("Json.Encode.dict identity ({})", T::encoder_type())
             }
@@ -338,15 +203,7 @@ macro_rules! impl_builtin_map {
 
 macro_rules! impl_builtin_ptr {
     ($rust_type: ty) => {
-        impl<T: Elm + ElmJson + ?Sized> ElmJson for $rust_type {
-            fn decoder_type() -> String {
-                ::std::format!("{}", T::decoder_type())
-            }
-
-            fn decoder_definition() -> Option<String> {
-                T::decoder_definition()
-            }
-
+        impl<T: Elm + ElmEncode + ?Sized> ElmEncode for $rust_type {
             fn encoder_type() -> String {
                 ::std::format!("{}", T::encoder_type())
             }
@@ -596,15 +453,7 @@ impl_builtin!(
     "Json.Encode.string"
 );
 #[cfg(feature = "chrono")]
-impl<T: chrono::TimeZone> ElmJson for chrono::DateTime<T> {
-    fn decoder_type() -> String {
-        String::decoder_type()
-    }
-
-    fn decoder_definition() -> Option<String> {
-        String::decoder_definition()
-    }
-
+impl<T: chrono::TimeZone> ElmEncode for chrono::DateTime<T> {
     fn encoder_type() -> String {
         String::encoder_type()
     }

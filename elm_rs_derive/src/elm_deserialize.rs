@@ -1,4 +1,4 @@
-//! Derive macro for ElmJson.
+//! Derive macro for ElmDecode.
 
 use super::{EnumVariantKind, Intermediate, TypeInfo};
 #[cfg(feature = "serde")]
@@ -34,19 +34,14 @@ fn intermediate_to_token_stream(
     }: Intermediate,
 ) -> Result<TokenStream2, syn::Error> {
     let decoder_type = format!("{}Decoder", elm_type.to_lower_camel_case());
-    let encoder_type = format!("{}Encoder", elm_type.to_lower_camel_case());
 
-    let Coder { encoder, decoder } = match type_info {
-        TypeInfo::Unit => struct_unit(&elm_type, &encoder_type, &decoder_type),
-        TypeInfo::Newtype(ty) => struct_newtype(&elm_type, &encoder_type, &decoder_type, &ty),
-        TypeInfo::Tuple(tys) => struct_tuple(&elm_type, &encoder_type, &decoder_type, &tys),
-        TypeInfo::Struct(fields) => struct_named(
-            &elm_type,
-            &encoder_type,
-            &decoder_type,
-            &fields,
-            &container_attributes,
-        ),
+    let decoder = match type_info {
+        TypeInfo::Unit => struct_unit(&elm_type, &decoder_type),
+        TypeInfo::Newtype(ty) => struct_newtype(&elm_type, &decoder_type, &ty),
+        TypeInfo::Tuple(tys) => struct_tuple(&elm_type, &decoder_type, &tys),
+        TypeInfo::Struct(fields) => {
+            struct_named(&elm_type, &decoder_type, &fields, &container_attributes)
+        }
         TypeInfo::Enum {
             variants,
             #[cfg(feature = "serde")]
@@ -54,16 +49,11 @@ fn intermediate_to_token_stream(
         } => {
             #[cfg(feature = "serde")]
             let representation = match representation {
-                EnumRepresentation::External => enum_external(
-                    &elm_type,
-                    &encoder_type,
-                    &decoder_type,
-                    variants,
-                    &container_attributes,
-                ),
+                EnumRepresentation::External => {
+                    enum_external(&elm_type, &decoder_type, variants, &container_attributes)
+                }
                 EnumRepresentation::Internal { tag } => enum_internal(
                     &elm_type,
-                    &encoder_type,
                     &decoder_type,
                     variants,
                     &tag,
@@ -71,54 +61,37 @@ fn intermediate_to_token_stream(
                 )?,
                 EnumRepresentation::Adjacent { tag, content } => enum_adjacent(
                     &elm_type,
-                    &encoder_type,
                     &decoder_type,
                     variants,
                     &tag,
                     &content,
                     &container_attributes,
                 )?,
-                EnumRepresentation::Untagged => enum_untagged(
-                    &elm_type,
-                    &encoder_type,
-                    &decoder_type,
-                    variants,
-                    &container_attributes,
-                )?,
+                EnumRepresentation::Untagged => {
+                    enum_untagged(&elm_type, &decoder_type, variants, &container_attributes)?
+                }
             };
             #[cfg(not(feature = "serde"))]
-            let representation = enum_external(
-                &elm_type,
-                &encoder_type,
-                &decoder_type,
-                variants,
-                &container_attributes,
-            );
+            let representation =
+                enum_external(&elm_type, &decoder_type, variants, &container_attributes);
             representation
         }
     };
 
     for p in generics.type_params_mut() {
         p.bounds.push(syn::parse_str("::elm_rs::Elm").unwrap());
-        p.bounds.push(syn::parse_str("::elm_rs::ElmJson").unwrap());
+        p.bounds
+            .push(syn::parse_str("::elm_rs::ElmDecode").unwrap());
     }
 
     let res = quote! {
-        impl #generics ::elm_rs::ElmJson for #ident #generics_without_bounds {
+        impl #generics ::elm_rs::ElmDecode for #ident #generics_without_bounds {
             fn decoder_type() -> ::std::string::String {
                 ::std::convert::From::from(#decoder_type)
             }
 
             fn decoder_definition() -> ::std::option::Option<::std::string::String> {
                 ::std::option::Option::Some(#decoder)
-            }
-
-            fn encoder_type() -> ::std::string::String {
-                ::std::convert::From::from(#encoder_type)
-            }
-
-            fn encoder_definition() -> ::std::option::Option<::std::string::String> {
-                ::std::option::Option::Some(#encoder)
             }
         }
     };
@@ -129,51 +102,25 @@ fn intermediate_to_token_stream(
 // structs
 // =======
 
-struct Coder {
-    encoder: TokenStream2,
-    decoder: TokenStream2,
-}
-
 /// #[derive(Deserialize, Serialize)]
 /// struct Unit;
 /// "null"
-fn struct_unit(elm_type: &str, encoder_type: &str, decoder_type: &str) -> Coder {
-    let encoder = quote! {::std::format!("\
-{encoder_type} : {elm_type} -> Json.Encode.Value
-{encoder_type} _ =
-    Json.Encode.null
-",
-        elm_type = #elm_type,
-        encoder_type = #encoder_type,
-    )};
-
-    let decoder = quote! {::std::format!("\
+fn struct_unit(elm_type: &str, decoder_type: &str) -> TokenStream2 {
+    quote! {::std::format!("\
 {decoder_type} : Json.Decode.Decoder {elm_type}
 {decoder_type} =
     Json.Decode.null {elm_type}
 ",
         elm_type = #elm_type,
         decoder_type = #decoder_type,
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
 /// struct Newtype(i32);
 /// "0"
-fn struct_newtype(elm_type: &str, encoder_type: &str, decoder_type: &str, ty: &Type) -> Coder {
-    let encoder = quote! {::std::format!("\
-{encoder_type} : {elm_type} -> Json.Encode.Value
-{encoder_type} ({elm_type} inner) =
-    ({inner_encoder}) inner
-",
-        elm_type = #elm_type,
-        encoder_type = #encoder_type,
-        inner_encoder = <#ty>::encoder_type(),
-    )};
-
-    let decoder = quote! {::std::format!("\
+fn struct_newtype(elm_type: &str, decoder_type: &str, ty: &Type) -> TokenStream2 {
+    quote! {::std::format!("\
 {decoder_type} : Json.Decode.Decoder {elm_type}
 {decoder_type} =
     Json.Decode.map {elm_type} ({inner_decoder})
@@ -181,46 +128,15 @@ fn struct_newtype(elm_type: &str, encoder_type: &str, decoder_type: &str, ty: &T
         elm_type = #elm_type,
         decoder_type = #decoder_type,
         inner_decoder = <#ty>::decoder_type(),
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
 /// struct Tuple(i32, i32);
 /// "[0,0]"
-fn struct_tuple(
-    elm_type: &str,
-    encoder_type: &str,
-    decoder_type: &str,
-    inner_types: &[Type],
-) -> Coder {
+fn struct_tuple(elm_type: &str, decoder_type: &str, inner_types: &[Type]) -> TokenStream2 {
     let indices: Vec<usize> = inner_types.iter().enumerate().map(|(i, _)| i).collect();
-
-    let encoder = quote! {::std::format!("\
-{encoder_type} : {elm_type} -> Json.Encode.Value
-{encoder_type} ({elm_type} {params}) =
-    Json.Encode.list identity
-        [ {encoders}
-        ]
-",
-        elm_type = #elm_type,
-        encoder_type = #encoder_type,
-        params = (&[#(::std::format!("t{idx}",
-                idx = #indices)),*
-            ]
-        ).join(" "),
-        encoders = (
-            &[
-                #(::std::format!("({encoder}) t{idx}",
-                    encoder = <#inner_types>::encoder_type(),
-                    idx = #indices)
-                ),*
-            ]
-        ).join("\n        , "),
-    )};
-
-    let decoder = quote! {::std::format!("\
+    quote! {::std::format!("\
 {decoder_type} : Json.Decode.Decoder {elm_type}
 {decoder_type} =
     Json.Decode.succeed {elm_type}
@@ -236,9 +152,7 @@ fn struct_tuple(
                 ),*
             ]
         ).join("\n        ")
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
@@ -248,21 +162,20 @@ fn struct_tuple(
 /// "{\"a\":0}"
 fn struct_named(
     elm_type: &str,
-    encoder_type: &str,
     decoder_type: &str,
     fields: &[StructField],
     container_attributes: &ContainerAttributes,
-) -> Coder {
+) -> TokenStream2 {
     let mut field_decoders = vec![];
     for field in fields {
         let ty = &field.ty;
         let field_name_deserialize = field.name_deserialize(container_attributes);
         field_decoders.push(quote!{::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{field_name_deserialize}\" ({decoder})))",
                 field_name_deserialize = #field_name_deserialize,
-                decoder = <#ty as ::elm_rs::ElmJson>::decoder_type(),
+                decoder = <#ty as ::elm_rs::ElmDecode>::decoder_type(),
         )});
     }
-    let decoder = quote! {::std::format!("\
+    quote! {::std::format!("\
 {decoder_type} : Json.Decode.Decoder {elm_type}
 {decoder_type} =
     Json.Decode.succeed {elm_type}
@@ -275,37 +188,7 @@ fn struct_named(
                 #(#field_decoders),*
             ]
         ).join("\n        "),
-    )};
-
-    let mut field_encoders = vec![];
-    for field in fields {
-        let field_name = field.name_elm();
-        let field_name_serialize = field.name_serialize(container_attributes);
-        let ty = &field.ty;
-        field_encoders.push(
-            quote! {::std::format!("( \"{field_name_serialize}\", ({encoder}) struct.{field_name} )",
-            field_name_serialize = #field_name_serialize,
-            encoder = <#ty as ::elm_rs::ElmJson>::encoder_type(),
-            field_name = #field_name)},
-        )
-    }
-    let encoder = quote! {::std::format!("\
-{encoder_type} : {elm_type} -> Json.Encode.Value
-{encoder_type} struct =
-    Json.Encode.object
-        [ {fields}
-        ]
-",
-        elm_type = #elm_type,
-        encoder_type = #encoder_type,
-        fields = (
-            &[
-                #(#field_encoders),*
-            ]
-        ).join("\n        , "),
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 // =====
@@ -326,12 +209,10 @@ fn struct_named(
 /// "{\"Struct\":{\"a\":0}}"
 fn enum_external(
     elm_type: &str,
-    encoder_name: &str,
     decoder_name: &str,
     variants: Vec<EnumVariant>,
     container_attributes: &ContainerAttributes,
-) -> Coder {
-    let mut encoders = vec![];
+) -> TokenStream2 {
     let mut decoders = vec![];
     let mut constructors = vec![];
     let mut other_decoder = None;
@@ -342,7 +223,6 @@ fn enum_external(
         }
 
         let elm_name = variant.name_elm();
-        let elm_name_serialize = variant.name_serialize(container_attributes);
         let elm_name_deserialize = variant.name_deserialize(container_attributes);
         #[cfg(feature = "serde")]
         if variant.serde_attributes.other {
@@ -350,54 +230,30 @@ fn enum_external(
                 Some(quote! {::std::format!("Json.Decode.succeed {}", #elm_name_deserialize)});
         }
 
-        let coder = match &variant.variant {
-            EnumVariantKind::Unit => {
-                enum_variant_unit_external(&elm_name, &elm_name_serialize, &elm_name_deserialize)
+        let decoder = match &variant.variant {
+            EnumVariantKind::Unit => enum_variant_unit_external(&elm_name, &elm_name_deserialize),
+            EnumVariantKind::Newtype(inner) => {
+                enum_variant_newtype_external(&elm_name, &elm_name_deserialize, inner)
             }
-            EnumVariantKind::Newtype(inner) => enum_variant_newtype_external(
-                &elm_name,
-                &elm_name_serialize,
-                &elm_name_deserialize,
-                inner,
-            ),
-            EnumVariantKind::Tuple(types) => enum_variant_tuple_external(
-                &elm_name,
-                &elm_name_serialize,
-                &elm_name_deserialize,
-                types,
-            ),
+            EnumVariantKind::Tuple(types) => {
+                enum_variant_tuple_external(&elm_name, &elm_name_deserialize, types)
+            }
             EnumVariantKind::Struct(fields) => {
-                let (coder, constructor) = enum_variant_struct_external(
+                let (decoder, constructor) = enum_variant_struct_external(
                     &elm_name,
-                    &elm_name_serialize,
                     &elm_name_deserialize,
                     fields,
                     container_attributes,
                 );
                 constructors.push(constructor);
-                coder
+                decoder
             }
         };
-        encoders.push(coder.encoder);
-        decoders.push(coder.decoder);
+        decoders.push(decoder);
     }
     if let Some(other_decoder) = other_decoder {
         decoders.push(other_decoder)
     }
-
-    let encoder = quote! {::std::format!("\
-{encoder_name} : {elm_type} -> Json.Encode.Value
-{encoder_name} enum =
-    case enum of
-        {encoders}",
-        encoder_name = #encoder_name,
-        elm_type = #elm_type,
-        encoders = (
-            &[
-                #(#encoders),*
-            ]
-        ).join("\n        ")
-    )};
 
     let constructors = if constructors.is_empty() {
         quote! {""}
@@ -413,7 +269,7 @@ fn enum_external(
         )}
     };
 
-    let decoder = quote! {::std::format!("\
+    quote! {::std::format!("\
 {decoder_name} : Json.Decode.Decoder {elm_type}
 {decoder_name} = {constructors}
     Json.Decode.oneOf
@@ -427,9 +283,7 @@ fn enum_external(
                 #(#decoders),*
             ]
         ).join("\n        , ")
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 // an object with a tag field
@@ -441,15 +295,14 @@ fn enum_external(
 /// }
 /// "{\"t\":\"Unit\"}"
 /// "{\"t\":\"Struct\",\"a\":0}"
+#[cfg(feature = "serde")]
 fn enum_internal(
     elm_type: &str,
-    encoder_name: &str,
     decoder_name: &str,
     variants: Vec<EnumVariant>,
     tag: &str,
     container_attributes: &ContainerAttributes,
-) -> Result<Coder, syn::Error> {
-    let mut encoders = vec![];
+) -> Result<TokenStream2, syn::Error> {
     let mut decoders = vec![];
     let mut constructors = vec![];
     let mut other_decoder = None;
@@ -460,7 +313,6 @@ fn enum_internal(
         }
 
         let elm_name = variant.name_elm();
-        let elm_name_serialize = variant.name_serialize(container_attributes);
         let elm_name_deserialize = variant.name_deserialize(container_attributes);
         #[cfg(feature = "serde")]
         if variant.serde_attributes.other {
@@ -469,13 +321,10 @@ _ ->
                 Json.Decode.succeed {}", #elm_name_deserialize)});
         }
 
-        let coder = match &variant.variant {
-            EnumVariantKind::Unit => enum_variant_unit_internal_or_adjacent(
-                tag,
-                &elm_name,
-                &elm_name_serialize,
-                &elm_name_deserialize,
-            ),
+        let decoder = match &variant.variant {
+            EnumVariantKind::Unit => {
+                enum_variant_unit_internal_or_adjacent(&elm_name, &elm_name_deserialize)
+            }
             EnumVariantKind::Newtype(_) => {
                 return Err(syn::Error::new(
                     variant.span,
@@ -489,36 +338,21 @@ _ ->
                 ))
             }
             EnumVariantKind::Struct(fields) => {
-                let (coder, constructor) = enum_variant_struct_internal(
-                    tag,
+                let (decoder, constructor) = enum_variant_struct_internal(
                     &elm_name,
-                    &elm_name_serialize,
                     &elm_name_deserialize,
                     fields,
                     container_attributes,
                 );
                 constructors.push(constructor);
-                coder
+                decoder
             }
         };
-        encoders.push(coder.encoder);
-        decoders.push(coder.decoder);
+        decoders.push(decoder);
     }
     if let Some(other_decoder) = other_decoder {
         decoders.push(other_decoder)
     }
-
-    let encoder = quote! {::std::format!("\
-{encoder_name} : {elm_type} -> Json.Encode.Value
-{encoder_name} enum =
-    case enum of
-        {encoders}",
-        encoder_name = #encoder_name,
-        elm_type = #elm_type,
-        encoders = (&[
-                #(#encoders),*
-        ]).join("\n        ")
-    )};
 
     let constructors = if constructors.is_empty() {
         quote! {""}
@@ -554,7 +388,7 @@ _ ->
         ).join("\n                    ")
     )};
 
-    Ok(Coder { encoder, decoder })
+    Ok(decoder)
 }
 
 // an object with tag and content fields
@@ -570,16 +404,15 @@ _ ->
 /// "{\"t\":\"Newtype\",\"c\":0}"
 /// "{\"t\":\"Tuple\",\"c\":[0,0]}"
 /// "{\"t\":\"Struct\",\"c\":{\"a\":0}}"
+#[cfg(feature = "serde")]
 fn enum_adjacent(
     elm_type: &str,
-    encoder_name: &str,
     decoder_name: &str,
     variants: Vec<EnumVariant>,
     tag: &str,
     content: &str,
     container_attributes: &ContainerAttributes,
-) -> Result<Coder, syn::Error> {
-    let mut encoders = vec![];
+) -> Result<TokenStream2, syn::Error> {
     let mut decoders = vec![];
     let mut constructors = vec![];
     let mut other_decoder = None;
@@ -590,7 +423,6 @@ fn enum_adjacent(
         }
 
         let elm_name = variant.name_elm();
-        let elm_name_serialize = variant.name_serialize(container_attributes);
         let elm_name_deserialize = variant.name_deserialize(container_attributes);
         #[cfg(feature = "serde")]
         if variant.serde_attributes.other {
@@ -599,61 +431,33 @@ _ ->
                 Json.Decode.succeed {}", #elm_name_deserialize)});
         }
 
-        let coder = match &variant.variant {
-            EnumVariantKind::Unit => enum_variant_unit_internal_or_adjacent(
-                tag,
-                &elm_name,
-                &elm_name_serialize,
-                &elm_name_deserialize,
-            ),
-            EnumVariantKind::Newtype(inner) => enum_variant_newtype_adjacent(
-                tag,
-                content,
-                &elm_name,
-                &elm_name_serialize,
-                &elm_name_deserialize,
-                inner,
-            ),
-            EnumVariantKind::Tuple(types) => enum_variant_tuple_adjacent(
-                tag,
-                content,
-                &elm_name,
-                &elm_name_serialize,
-                &elm_name_deserialize,
-                types,
-            ),
+        let decoder = match &variant.variant {
+            EnumVariantKind::Unit => {
+                enum_variant_unit_internal_or_adjacent(&elm_name, &elm_name_deserialize)
+            }
+            EnumVariantKind::Newtype(inner) => {
+                enum_variant_newtype_adjacent(content, &elm_name, &elm_name_deserialize, inner)
+            }
+            EnumVariantKind::Tuple(types) => {
+                enum_variant_tuple_adjacent(content, &elm_name, &elm_name_deserialize, types)
+            }
             EnumVariantKind::Struct(fields) => {
-                let (coder, constructor) = enum_variant_struct_adjacent(
-                    tag,
+                let (decoder, constructor) = enum_variant_struct_adjacent(
                     content,
                     &elm_name,
-                    &elm_name_serialize,
                     &elm_name_deserialize,
                     fields,
                     container_attributes,
                 );
                 constructors.push(constructor);
-                coder
+                decoder
             }
         };
-        encoders.push(coder.encoder);
-        decoders.push(coder.decoder);
+        decoders.push(decoder);
     }
     if let Some(other_decoder) = other_decoder {
         decoders.push(other_decoder)
     }
-
-    let encoder = quote! {::std::format!("\
-{encoder_name} : {elm_type} -> Json.Encode.Value
-{encoder_name} enum =
-    case enum of
-        {encoders}",
-        encoder_name = #encoder_name,
-        elm_type = #elm_type,
-        encoders = (&[
-                #(#encoders),*
-        ]).join("\n        ")
-    )};
 
     let constructors = if constructors.is_empty() {
         quote! {""}
@@ -688,8 +492,7 @@ _ ->
             ]
         ).join("\n                    ")
     )};
-
-    Ok(Coder { encoder, decoder })
+    Ok(decoder)
 }
 
 // no tag
@@ -705,14 +508,13 @@ _ ->
 /// "0"
 /// "[0,0]"
 /// "{\"a\":0}"
+#[cfg(feature = "serde")]
 fn enum_untagged(
     elm_type: &str,
-    encoder_name: &str,
     decoder_name: &str,
     variants: Vec<EnumVariant>,
     container_attributes: &ContainerAttributes,
-) -> Result<Coder, syn::Error> {
-    let mut encoders = vec![];
+) -> Result<TokenStream2, syn::Error> {
     let mut decoders = vec![];
     let mut constructors = vec![];
     for variant in variants {
@@ -722,34 +524,19 @@ fn enum_untagged(
         }
 
         let elm_name = variant.name_elm();
-        let coder = match &variant.variant {
+        let decoder = match &variant.variant {
             EnumVariantKind::Unit => enum_variant_unit_untagged(&elm_name),
             EnumVariantKind::Newtype(inner) => enum_variant_newtype_untagged(&elm_name, inner),
             EnumVariantKind::Tuple(types) => enum_variant_tuple_untagged(&elm_name, types),
             EnumVariantKind::Struct(fields) => {
-                let (coder, constructor) =
+                let (decoder, constructor) =
                     enum_variant_struct_untagged(&elm_name, fields, container_attributes);
                 constructors.push(constructor);
-                coder
+                decoder
             }
         };
-        encoders.push(coder.encoder);
-        decoders.push(coder.decoder);
+        decoders.push(decoder);
     }
-
-    let encoder = quote! {::std::format!("\
-{encoder_name} : {elm_type} -> Json.Encode.Value
-{encoder_name} enum =
-    case enum of
-        {encoders}",
-        encoder_name = #encoder_name,
-        elm_type = #elm_type,
-        encoders = (
-            &[
-                #(#encoders),*
-            ]
-        ).join("\n        ")
-    )};
 
     let constructors = if constructors.is_empty() {
         quote! {""}
@@ -781,7 +568,7 @@ fn enum_untagged(
         ).join("\n    , ")
     )};
 
-    Ok(Coder { encoder, decoder })
+    Ok(decoder)
 }
 
 // =================
@@ -793,19 +580,8 @@ fn enum_untagged(
 ///     Unit,
 /// }
 /// "\"Unit\""
-fn enum_variant_unit_external(
-    variant_name: &str,
-    variant_name_serialize: &str,
-    variant_name_deserialize: &str,
-) -> Coder {
-    let encoder = quote! {::std::format!("\
-    {variant_name} ->
-            Json.Encode.string \"{variant_name_serialize}\"",
-        variant_name = #variant_name,
-        variant_name_serialize = #variant_name_serialize,
-    )};
-
-    let decoder = quote! {::std::format!("\
+fn enum_variant_unit_external(variant_name: &str, variant_name_deserialize: &str) -> TokenStream2 {
+    quote! {::std::format!("\
 Json.Decode.string
             |> Json.Decode.andThen
                 (\\x ->
@@ -817,9 +593,7 @@ Json.Decode.string
                 )",
         variant_name = #variant_name,
         enum_variant_deserialize = #variant_name_deserialize
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
@@ -829,26 +603,15 @@ Json.Decode.string
 /// "{\"Newtype\":0}"
 fn enum_variant_newtype_external(
     variant_name: &str,
-    variant_name_serialize: &str,
     variant_name_deserialize: &str,
     inner_type: &TokenStream2,
-) -> Coder {
-    let encoder = quote! { format!("\
-{variant_name} inner ->
-            Json.Encode.object [ ( \"{variant_name_serialize}\", {encoder} inner ) ]",
-        variant_name = #variant_name,
-        variant_name_serialize = #variant_name_serialize,
-        encoder = <#inner_type as ::elm_rs::ElmJson>::encoder_type(),
-    )};
-
-    let decoder = quote! {::std::format!("\
+) -> TokenStream2 {
+    quote! {::std::format!("\
     Json.Decode.map {enum_variant} (Json.Decode.field \"{enum_variant_deserialize}\" ({decoder}))",
         enum_variant = #variant_name,
         enum_variant_deserialize = #variant_name_deserialize,
-        decoder = <#inner_type as ::elm_rs::ElmJson>::decoder_type(),
-    )};
-
-    Coder { encoder, decoder }
+        decoder = <#inner_type as ::elm_rs::ElmDecode>::decoder_type(),
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
@@ -858,33 +621,12 @@ fn enum_variant_newtype_external(
 /// "{\"Tuple\":[0,0]}"
 fn enum_variant_tuple_external(
     variant_name: &str,
-    variant_name_serialize: &str,
     variant_name_deserialize: &str,
     tuple_types: &[TokenStream2],
-) -> Coder {
+) -> TokenStream2 {
     let idx: Vec<usize> = (0..tuple_types.len()).collect();
-    let encoder = quote! {::std::format!("\
-{variant_name} {fields} ->
-            Json.Encode.object [ ( \"{variant_name_serialize}\", Json.Encode.list identity [ {encoders} ] ) ]",
-        variant_name = #variant_name,
-        fields = (
-            &[
-                #(::std::format!("t{}", #idx)
-                ),*
-            ]
-        ).join(" "),
-        variant_name_serialize = #variant_name_serialize,
-        encoders = (
-            &[
-                #(::std::format!("{} t{}",
-                    <#tuple_types as ::elm_rs::ElmJson>::encoder_type(),
-                    #idx
-                )),*
-            ]
-        ).join(", "),
-    )};
 
-    let decoder = quote! {::std::format!("\
+    quote! {::std::format!("\
     Json.Decode.field \"{variant_name_deserialize}\" (Json.Decode.succeed {variant_name} {decoders})",
         variant_name = #variant_name,
         variant_name_deserialize = #variant_name_deserialize,
@@ -892,13 +634,11 @@ fn enum_variant_tuple_external(
             &[
                 #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.index {} ({}) |> Json.Decode.map x)",
                     #idx,
-                    <#tuple_types as ::elm_rs::ElmJson>::decoder_type()
+                    <#tuple_types as ::elm_rs::ElmDecode>::decoder_type()
                 )),*
             ]
         ).join(" ")
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
@@ -908,11 +648,10 @@ fn enum_variant_tuple_external(
 /// "{\"Struct\":{\"a\":0}}"
 fn enum_variant_struct_external(
     variant_name: &str,
-    variant_name_serialize: &str,
     variant_name_deserialize: &str,
     fields: &[StructField],
     container_attributes: &ContainerAttributes,
-) -> (Coder, TokenStream2) {
+) -> (TokenStream2, TokenStream2) {
     let (field_names, tys): (Vec<_>, Vec<_>) = fields
         .iter()
         .map(|field| (field.name_elm(), &field.ty))
@@ -920,33 +659,8 @@ fn enum_variant_struct_external(
     let field_names_deserialize = fields
         .iter()
         .map(|field| field.name_deserialize(container_attributes));
-    let field_names_serialize = fields
-        .iter()
-        .map(|field| field.name_serialize(container_attributes));
 
     let constructor = constructor(variant_name, &field_names);
-
-    let encoder = quote! {::std::format!("\
-{variant_name} {{ {fields} }} ->
-            Json.Encode.object [ ( \"{variant_name_serialize}\", Json.Encode.object [ {encoders} ] ) ]",
-        variant_name = #variant_name,
-        variant_name_serialize = #variant_name_serialize,
-        fields =  (
-            &[
-                #(::std::format!("{}", #field_names,
-                )),*
-            ]
-        ).join(", "),
-        encoders = (
-            &[
-                #(::std::format!("( \"{}\", {} {} )",
-                    #field_names_serialize,
-                    <#tys as ::elm_rs::ElmJson>::encoder_type(),
-                    #field_names,
-                )),*
-            ]
-        ).join(", ")
-    )};
 
     let decoder = quote! {::std::format!("\
     Json.Decode.field \"{variant_name_deserialize}\" (Json.Decode.succeed construct{variant_name} {decoders})",
@@ -956,13 +670,13 @@ fn enum_variant_struct_external(
                 &[
                     #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{}\" ({})))",
                         #field_names_deserialize,
-                        <#tys as ::elm_rs::ElmJson>::decoder_type()
+                        <#tys as ::elm_rs::ElmDecode>::decoder_type()
                     )),*
                 ]
             ).join(" "),
     )};
 
-    (Coder { encoder, decoder }, constructor)
+    (decoder, constructor)
 }
 
 // =================
@@ -980,28 +694,17 @@ fn enum_variant_struct_external(
 ///     Unit,
 /// }
 /// "{\"t\":\"Unit\"}"
+#[cfg(feature = "serde")]
 fn enum_variant_unit_internal_or_adjacent(
-    tag: &str,
     variant_name: &str,
-    variant_name_serialize: &str,
     variant_name_deserialize: &str,
-) -> Coder {
-    let encoder = quote! {::std::format!("\
-{variant_name} ->
-            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_serialize}\" ) ]",
-        variant_name = #variant_name,
-        tag = #tag,
-        variant_name_serialize = #variant_name_serialize,
-    )};
-
-    let decoder = quote! { format!("\
+) -> TokenStream2 {
+    quote! { format!("\
 \"{variant_name_deserialize}\" ->
                         Json.Decode.succeed {variant_name}",
         variant_name = #variant_name,
         variant_name_deserialize = #variant_name_deserialize,
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
@@ -1010,14 +713,13 @@ fn enum_variant_unit_internal_or_adjacent(
 ///     Struct { a: i32 },
 /// }
 /// "{\"t\":\"Struct\",\"a\":0}"
+#[cfg(feature = "serde")]
 fn enum_variant_struct_internal(
-    tag: &str,
     variant_name: &str,
-    variant_name_serialize: &str,
     variant_name_deserialize: &str,
     fields: &[StructField],
     container_attributes: &ContainerAttributes,
-) -> (Coder, TokenStream2) {
+) -> (TokenStream2, TokenStream2) {
     let (field_names, tys): (Vec<_>, Vec<_>) = fields
         .iter()
         .map(|field| (field.name_elm(), &field.ty))
@@ -1025,31 +727,8 @@ fn enum_variant_struct_internal(
     let field_names_deserialize = fields
         .iter()
         .map(|field| field.name_deserialize(container_attributes));
-    let field_names_serialize = fields
-        .iter()
-        .map(|field| field.name_serialize(container_attributes));
 
     let constructor = constructor(variant_name, &field_names);
-
-    let encoder = quote! {::std::format!("\
-{variant_name} {{ {fields} }} ->
-            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_serialize}\" ), {encoders} ]",
-        variant_name = #variant_name,
-        fields = (&[
-                #(#field_names),*
-        ]).join(", "),
-        tag = #tag,
-        variant_name_serialize = #variant_name_serialize,
-        encoders = (
-            &[
-                #(::std::format!("( \"{}\", {} {} )",
-                    #field_names_serialize,
-                    <#tys>::encoder_type(),
-                    #field_names,
-                )),*
-            ]
-        ).join(", "),
-    )};
 
     let decoder = quote! {::std::format!("\
                     \"{variant_name_deserialize}\" ->
@@ -1060,13 +739,13 @@ fn enum_variant_struct_internal(
                 &[
                     #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{}\" ({})))",
                         #field_names_deserialize,
-                        <#tys as ::elm_rs::ElmJson>::decoder_type()
+                        <#tys as ::elm_rs::ElmDecode>::decoder_type()
                     )),*
                 ]
             ).join(" "),
     )};
 
-    (Coder { encoder, decoder }, constructor)
+    (decoder, constructor)
 }
 
 // #################
@@ -1079,34 +758,21 @@ fn enum_variant_struct_internal(
 ///     Newtype(i32),
 /// }
 /// "{\"t\":\"Newtype\",\"c\":0}"
+#[cfg(feature = "serde")]
 fn enum_variant_newtype_adjacent(
-    tag: &str,
     content: &str,
     variant_name: &str,
-    variant_name_serialize: &str,
     variant_name_deserialize: &str,
     inner_type: &TokenStream2,
-) -> Coder {
-    let encoder = quote! { format!("\
-    {variant_name} inner ->
-            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_serialize}\"), ( \"{content}\", {encoder} inner ) ]",
-        variant_name = #variant_name,
-        tag = #tag,
-        content = #content,
-        variant_name_serialize = #variant_name_serialize,
-        encoder = <#inner_type as ::elm_rs::ElmJson>::encoder_type(),
-    )};
-
-    let decoder = quote! {::std::format!("\
+) -> TokenStream2 {
+    quote! {::std::format!("\
 \"{variant_name_deserialize}\" ->
                         Json.Decode.map {variant_name} (Json.Decode.field \"{content}\" ({decoder}))",
         variant_name = #variant_name,
         variant_name_deserialize = #variant_name_deserialize,
         content = #content,
-        decoder = <#inner_type as ::elm_rs::ElmJson>::decoder_type(),
-    )};
-
-    Coder { encoder, decoder }
+        decoder = <#inner_type as ::elm_rs::ElmDecode>::decoder_type(),
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
@@ -1115,38 +781,16 @@ fn enum_variant_newtype_adjacent(
 ///     Tuple(i32, i32),
 /// }
 /// "{\"t\":\"Tuple\",\"c\":[0,0]}"
+#[cfg(feature = "serde")]
 fn enum_variant_tuple_adjacent(
-    tag: &str,
     content: &str,
     variant_name: &str,
-    variant_name_serialize: &str,
     variant_name_deserialize: &str,
     tuple_types: &[TokenStream2],
-) -> Coder {
+) -> TokenStream2 {
     let idx: Vec<usize> = (0..tuple_types.len()).collect();
 
-    let encoder = quote! { format!("\
-    {variant_name} {params} ->
-            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_serialize}\"), ( \"{content}\", Json.Encode.list identity [ {encoders} ] ) ]",
-        variant_name = #variant_name,
-        params = (
-            &[
-                #(::std::format!("t{}", #idx)
-                ),*
-            ]
-        ).join(" "),
-        tag = #tag,
-        content = #content,
-        variant_name_serialize = #variant_name_serialize,
-        encoders = (
-            &[
-                #(::std::format!("{} t{}", <#tuple_types as ::elm_rs::ElmJson>::encoder_type(), #idx)
-                ),*
-            ]
-        ).join(", "),
-    )};
-
-    let decoder = quote! {::std::format!("\
+    quote! {::std::format!("\
 \"{variant_name_deserialize}\" ->
                         Json.Decode.field \"{content}\" (Json.Decode.succeed {variant_name} {decoders})",
         variant_name = #variant_name,
@@ -1156,13 +800,11 @@ fn enum_variant_tuple_adjacent(
             &[
                 #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.index {} ({}) |> Json.Decode.map x)",
                     #idx,
-                    <#tuple_types as ::elm_rs::ElmJson>::decoder_type())
+                    <#tuple_types as ::elm_rs::ElmDecode>::decoder_type())
                 ),*
             ]
         ).join(" "),
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
@@ -1171,46 +813,19 @@ fn enum_variant_tuple_adjacent(
 ///     Struct { a: i32 },
 /// }
 /// "{\"t\":\"Struct\",\"c\":{\"a\":0}}"
+#[cfg(feature = "serde")]
 fn enum_variant_struct_adjacent(
-    tag: &str,
     content: &str,
     variant_name: &str,
-    variant_name_serialize: &str,
     variant_name_deserialize: &str,
     fields: &[StructField],
     container_attributes: &ContainerAttributes,
-) -> (Coder, TokenStream2) {
-    let (field_names, tys): (Vec<_>, Vec<_>) = fields
+) -> (TokenStream2, TokenStream2) {
+    let field_names = fields
         .iter()
-        .map(|field| (field.name_elm(), &field.ty))
-        .unzip();
+        .map(|field| field.name_elm())
+        .collect::<Vec<_>>();
     let constructor = constructor(variant_name, &field_names);
-
-    let field_names_serialize = fields
-        .iter()
-        .map(|field| field.name_serialize(container_attributes));
-    let encoder = quote! { format!("\
-    {variant_name} {{ {fields} }} ->
-            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_serialize}\"), ( \"{content}\", Json.Encode.object [ {encoders} ] ) ]",
-        variant_name = #variant_name,
-        fields = (
-            &[
-                #(::std::format!("{}", #field_names)),*
-            ]
-        ).join(", "),
-        tag = #tag,
-        content = #content,
-        variant_name_serialize = #variant_name_serialize,
-        encoders = (
-            &[
-                #(::std::format!("( \"{}\", {} {} )",
-                    #field_names_serialize,
-                    <#tys as ::elm_rs::ElmJson>::encoder_type(),
-                    #field_names,
-                )),*
-            ]
-        ).join(", "),
-    )};
 
     let mut field_decoders = vec![];
     for field in fields {
@@ -1218,7 +833,7 @@ fn enum_variant_struct_adjacent(
         let field_name_deserialize = field.name_deserialize(container_attributes);
         field_decoders.push(quote!{::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{field_name_deserialize}\" ({decoder})))",
                 field_name_deserialize = #field_name_deserialize,
-                decoder = <#ty as ::elm_rs::ElmJson>::decoder_type(),
+                decoder = <#ty as ::elm_rs::ElmDecode>::decoder_type(),
         )});
     }
     let decoder = quote! {::std::format!("\
@@ -1234,7 +849,7 @@ fn enum_variant_struct_adjacent(
         ).join("\n        "),
     )};
 
-    (Coder { encoder, decoder }, constructor)
+    (decoder, constructor)
 }
 
 // #################
@@ -1247,19 +862,12 @@ fn enum_variant_struct_adjacent(
 ///     Unit,
 /// }
 /// "null"
-fn enum_variant_unit_untagged(variant_name: &str) -> Coder {
-    let encoder = quote! {::std::format!("\
-{variant_name} ->
-            Json.Encode.null",
-        variant_name = #variant_name
-    )};
-
-    let decoder = quote! {::std::format!("\
+#[cfg(feature = "serde")]
+fn enum_variant_unit_untagged(variant_name: &str) -> TokenStream2 {
+    quote! {::std::format!("\
     Json.Decode.null {variant_name}",
         variant_name = #variant_name
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
@@ -1268,21 +876,13 @@ fn enum_variant_unit_untagged(variant_name: &str) -> Coder {
 ///     Newtype(i32),
 /// }
 /// "0"
-fn enum_variant_newtype_untagged(variant_name: &str, inner: &TokenStream2) -> Coder {
-    let encoder = quote! {::std::format!("\
-{variant_name} inner ->
-            {encoder} inner",
-        variant_name = #variant_name,
-        encoder = <#inner as ::elm_rs::ElmJson>::encoder_type(),
-    )};
-
-    let decoder = quote! {::std::format!("\
+#[cfg(feature = "serde")]
+fn enum_variant_newtype_untagged(variant_name: &str, inner: &TokenStream2) -> TokenStream2 {
+    quote! {::std::format!("\
     Json.Decode.map {variant_name} ({decoder})",
         variant_name = #variant_name,
-        decoder = <#inner as ::elm_rs::ElmJson>::decoder_type(),
-    )};
-
-    Coder { encoder, decoder }
+        decoder = <#inner as ::elm_rs::ElmDecode>::decoder_type(),
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
@@ -1291,46 +891,21 @@ fn enum_variant_newtype_untagged(variant_name: &str, inner: &TokenStream2) -> Co
 ///     Tuple(i32, i32),
 /// }
 /// "[0,0]"
-fn enum_variant_tuple_untagged(variant_name: &str, tuple_types: &[TokenStream2]) -> Coder {
+#[cfg(feature = "serde")]
+fn enum_variant_tuple_untagged(variant_name: &str, tuple_types: &[TokenStream2]) -> TokenStream2 {
     let idx: Vec<usize> = (0..tuple_types.len()).collect();
-    let encoder = quote! {::std::format!("\
-{variant_name} {params} -> 
-            Json.Encode.list identity
-            [ {encoders}
-            ]",
-        variant_name = #variant_name,
-        params = (
-            &[
-                #(::std::format!("t{idx}",
-                    idx = #idx
-                )),*
-            ]
-        ).join(" "),
-        encoders = (
-            &[
-                #(::std::format!("({}) t{}",
-                    <#tuple_types as ::elm_rs::ElmJson>::encoder_type(),
-                    #idx
-                )),*
-            ]
-        ).join("\n            , "),
-    )};
-
-    let idx: Vec<usize> = (0..tuple_types.len()).collect();
-    let decoder = quote! {::std::format!("\
+    quote! {::std::format!("\
     Json.Decode.succeed {enum_variant} {decoders}",
         enum_variant = #variant_name,
         decoders = (
             &[
                 #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.index {} ({}) |> Json.Decode.map x)",
                     #idx,
-                    <#tuple_types as ::elm_rs::ElmJson>::decoder_type()
+                    <#tuple_types as ::elm_rs::ElmDecode>::decoder_type()
                 )),*
             ]
         ).join(" ")
-    )};
-
-    Coder { encoder, decoder }
+    )}
 }
 
 /// #[derive(Deserialize, Serialize)]
@@ -1339,11 +914,12 @@ fn enum_variant_tuple_untagged(variant_name: &str, tuple_types: &[TokenStream2])
 ///     Struct { a: i32 },
 /// }
 /// "{\"a\":0}"
+#[cfg(feature = "serde")]
 fn enum_variant_struct_untagged(
     variant_name: &str,
     fields: &[StructField],
     container_attributes: &ContainerAttributes,
-) -> (Coder, TokenStream2) {
+) -> (TokenStream2, TokenStream2) {
     let (field_names, tys): (Vec<_>, Vec<_>) = fields
         .iter()
         .map(|field| (field.name_elm(), &field.ty))
@@ -1351,32 +927,7 @@ fn enum_variant_struct_untagged(
     let field_names_deserialize = fields
         .iter()
         .map(|field| field.name_deserialize(container_attributes));
-    let field_names_serialize = fields
-        .iter()
-        .map(|field| field.name_serialize(container_attributes));
     let constructor = constructor(variant_name, &field_names);
-
-    let encoder = quote! {::std::format!("\
-{variant_name} {{ {fields} }} ->
-            Json.Encode.object [ {encoders} ]",
-        variant_name = #variant_name,
-        fields =  (
-            &[
-                #(::std::format!("{}", #field_names,
-                )),*
-            ]
-        ).join(", "),
-        encoders = (
-            &[
-                #(::std::format!("( \"{}\", {} {} )",
-                    #field_names_serialize,
-                    <#tys as ::elm_rs::ElmJson>::encoder_type(),
-                    #field_names,
-                )),*
-            ]
-        ).join(", ")
-    )};
-
     let decoder = quote! {::std::format!("\
     Json.Decode.succeed construct{variant_name} {decoders}",
             variant_name = #variant_name,
@@ -1384,13 +935,13 @@ fn enum_variant_struct_untagged(
                 &[
                     #(::std::format!("|> Json.Decode.andThen (\\x -> Json.Decode.map x (Json.Decode.field \"{}\" ({})))",
                         #field_names_deserialize,
-                        <#tys as ::elm_rs::ElmJson>::decoder_type()
+                        <#tys as ::elm_rs::ElmDecode>::decoder_type()
                     )),*
                 ]
             ).join(" "),
     )};
 
-    (Coder { encoder, decoder }, constructor)
+    (decoder, constructor)
 }
 
 // #######

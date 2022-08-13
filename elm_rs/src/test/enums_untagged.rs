@@ -1,7 +1,7 @@
-use crate::{Elm, ElmJson};
+use crate::{Elm, ElmDecode, ElmEncode};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 #[serde(untagged)]
 enum Enum {
     Unit,

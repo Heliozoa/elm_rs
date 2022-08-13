@@ -10,10 +10,10 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::{Elm, ElmJson};
+use crate::{Elm, ElmDecode, ElmEncode};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, Elm, ElmJson)]
+#[derive(Debug, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 struct Types<T: Copy + Hash + Eq> {
     t: T,
     unit: (),

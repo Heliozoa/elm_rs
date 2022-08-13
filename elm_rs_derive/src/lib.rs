@@ -3,7 +3,9 @@
 mod attributes;
 mod elm;
 #[cfg(feature = "json")]
-mod json;
+mod elm_deserialize;
+#[cfg(feature = "json")]
+mod elm_serialize;
 #[cfg(feature = "query")]
 mod query;
 
@@ -39,11 +41,18 @@ pub fn derive_elm(input: TokenStream) -> TokenStream {
     elm::derive(input)
 }
 
-/// Derive `ElmJson`.
+/// Derive `ElmEncode`.
 #[cfg(feature = "json")]
-#[proc_macro_derive(ElmJson)]
-pub fn derive_elm_json(input: TokenStream) -> TokenStream {
-    json::derive(input)
+#[proc_macro_derive(ElmEncode)]
+pub fn derive_elm_serialize(input: TokenStream) -> TokenStream {
+    elm_serialize::derive(input)
+}
+
+/// Derive `ElmDecode`.
+#[cfg(feature = "json")]
+#[proc_macro_derive(ElmDecode)]
+pub fn derive_elm_deserialize(input: TokenStream) -> TokenStream {
+    elm_deserialize::derive(input)
 }
 
 /// Derive `ElmQuery`.
@@ -178,30 +187,7 @@ impl StructField {
 
     #[cfg(feature = "json")]
     fn name_serialize(&self, container_attributes: &ContainerAttributes) -> String {
-        // explicit rename has priority
-        #[cfg(feature = "serde")]
-        if let Some(rename) = self
-            .serde_attributes
-            .rename
-            .as_ref()
-            .or(self.serde_attributes.rename_serialize.as_ref())
-        {
-            rename.to_string()
-        } else if let Some(rename_all) = container_attributes
-            .serde
-            .rename_all
-            .or(container_attributes.serde.rename_all_serialize)
-        {
-            rename_all.rename_ident(&self.ident)
-        } else {
-            self.ident.to_string()
-        }
-        #[cfg(not(feature = "serde"))]
-        self.ident.to_string()
-    }
-
-    #[cfg(feature = "json")]
-    fn name_deserialize(&self, container_attributes: &ContainerAttributes) -> String {
+        // rename during Rust serialization = needs rename during Elm deserialization
         // explicit rename has priority
         #[cfg(feature = "serde")]
         if let Some(rename) = self
@@ -215,6 +201,31 @@ impl StructField {
             .serde
             .rename_all
             .or(container_attributes.serde.rename_all_deserialize)
+        {
+            rename_all.rename_ident(&self.ident)
+        } else {
+            self.ident.to_string()
+        }
+        #[cfg(not(feature = "serde"))]
+        self.ident.to_string()
+    }
+
+    #[cfg(feature = "json")]
+    fn name_deserialize(&self, container_attributes: &ContainerAttributes) -> String {
+        // rename during Rust deserialization = needs rename during Elm serialization
+        // explicit rename has priority
+        #[cfg(feature = "serde")]
+        if let Some(rename) = self
+            .serde_attributes
+            .rename
+            .as_ref()
+            .or(self.serde_attributes.rename_serialize.as_ref())
+        {
+            rename.to_string()
+        } else if let Some(rename_all) = container_attributes
+            .serde
+            .rename_all
+            .or(container_attributes.serde.rename_all_serialize)
         {
             rename_all.rename_ident(&self.ident)
         } else {
@@ -262,19 +273,20 @@ impl EnumVariant {
 
     #[cfg(feature = "json")]
     fn name_serialize(&self, container_attributes: &ContainerAttributes) -> String {
+        // rename during Rust serialization = needs rename during Elm deserialization
         // explicit rename has priority
         #[cfg(feature = "serde")]
         if let Some(rename) = self
             .serde_attributes
             .rename
             .as_ref()
-            .or(self.serde_attributes.rename_serialize.as_ref())
+            .or(self.serde_attributes.rename_deserialize.as_ref())
         {
             rename.clone()
         } else if let Some(rename_all) = container_attributes
             .serde
             .rename_all
-            .or(container_attributes.serde.rename_all_serialize)
+            .or(container_attributes.serde.rename_all_deserialize)
         {
             rename_all.rename_ident(&self.ident)
         } else {
@@ -286,19 +298,20 @@ impl EnumVariant {
 
     #[cfg(feature = "json")]
     fn name_deserialize(&self, container_attributes: &ContainerAttributes) -> String {
+        // rename during Rust deserialization = needs rename during Elm serialization
         // explicit rename has priority
         #[cfg(feature = "serde")]
         if let Some(rename) = self
             .serde_attributes
             .rename
             .as_ref()
-            .or(self.serde_attributes.rename_deserialize.as_ref())
+            .or(self.serde_attributes.rename_serialize.as_ref())
         {
             rename.to_string()
         } else if let Some(rename_all) = container_attributes
             .serde
             .rename_all
-            .or(container_attributes.serde.rename_all_deserialize)
+            .or(container_attributes.serde.rename_all_serialize)
         {
             rename_all.rename_ident(&self.ident)
         } else {

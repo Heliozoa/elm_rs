@@ -1,4 +1,4 @@
-use crate::{Elm, ElmJson, ElmQuery};
+use crate::{Elm, ElmDecode, ElmEncode, ElmQuery};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fmt::Debug,
@@ -18,13 +18,17 @@ mod structs;
 mod structs_serde;
 mod types;
 
-fn test_json<T: Elm + ElmJson + Serialize + DeserializeOwned + PartialEq + Debug>(t: T) {
+fn test_json<T: Elm + ElmEncode + ElmDecode + Serialize + DeserializeOwned + PartialEq + Debug>(
+    t: T,
+) {
     let t_2 = test_json_without_eq(&t, "");
     assert_eq!(t, t_2);
     return;
 }
 
-fn test_json_with_deps<T: Elm + ElmJson + Serialize + DeserializeOwned + PartialEq + Debug>(
+fn test_json_with_deps<
+    T: Elm + ElmEncode + ElmDecode + Serialize + DeserializeOwned + PartialEq + Debug,
+>(
     t: T,
     deps: &str,
 ) {
@@ -33,7 +37,9 @@ fn test_json_with_deps<T: Elm + ElmJson + Serialize + DeserializeOwned + Partial
     return;
 }
 
-fn test_json_without_eq<T: Elm + ElmJson + Serialize + DeserializeOwned + Debug>(
+fn test_json_without_eq<
+    T: Elm + ElmEncode + ElmDecode + ElmDecode + Serialize + DeserializeOwned + Debug,
+>(
     t: &T,
     deps: &str,
 ) -> T {
@@ -41,7 +47,7 @@ fn test_json_without_eq<T: Elm + ElmJson + Serialize + DeserializeOwned + Debug>
     test_with_json(&json, deps)
 }
 
-fn test_with_json<T: Elm + ElmJson + Serialize + DeserializeOwned + Debug>(
+fn test_with_json<T: Elm + ElmEncode + ElmDecode + Serialize + DeserializeOwned + Debug>(
     json: &str,
     deps: &str,
 ) -> T {
@@ -103,7 +109,7 @@ s
     return serde_json::from_str(&unescaped).unwrap();
 }
 
-fn test_query<T: Elm + ElmJson + ElmQuery + Serialize>(val: T, expected: &str) {
+fn test_query<T: Elm + ElmEncode + ElmDecode + ElmQuery + Serialize>(val: T, expected: &str) {
     let json = serde_json::to_string(&val).unwrap().replace("\"", "\\\"");
     let decoder_type = T::decoder_type();
     let elm_type = T::elm_definition().unwrap();
@@ -182,3 +188,6 @@ fn run_repl(input: &str) -> String {
     }
     panic!("not found");
 }
+
+#[cfg(any(not(feature = "derive"), not(feature = "serde")))]
+compile_error!("The tests require the `derive` and `serde` features to be activated.");
