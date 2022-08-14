@@ -1,13 +1,14 @@
+# elm_rs
 Automatically generate type definitions and functions for your Elm frontend from your Rust backend types, making it easy to keep the two in sync. Currently supports generating
 - Elm types with the `Elm` trait and derive macro
 - JSON encoders with the `ElmEncode` trait and derive macro, compatible with `serde_json`
 - JSON decoders with the `ElmDecode` trait and derive macro, compatible with `serde_json`
+- URL query encoders with the `ElmQuery` and `ElmQueryField` traits and derive macros
 
-### Usage
+## Usage
 For example, the following code
-<!-- Keep up to date with ./examples/example.rs -->
 ```rust
-use elm_rs::{Elm, ElmDecode, ElmEncode, ElmQuery, ElmQueryField};
+use elm_rs::{Elm, ElmEncode, ElmDecode, ElmQuery, ElmQueryField};
 
 #[derive(Elm, ElmEncode, ElmDecode)]
 enum Filetype {
@@ -36,16 +37,19 @@ enum Size {
 }
 
 fn main() {
-    // the target would typically be a file, here we print the generated code instead
+    // the target would typically be a file
     let mut target = vec![];
     // elm_rs provides a macro for conveniently creating an Elm module with everything needed
     elm_rs::export!("Bindings", &mut target, {
-        encoders: [Filetype, Drawing], // generates Elm type definitions and encoders (requires ElmEncoder)
-        decoders: [Filetype, Drawing], // generates Elm type definitions and decoders (requires ElmDecoder)
-        queries: [Query],  // generates Elm type definitions and helper functions for forming queries (requires ElmQuery)
+        // generates types and encoders for types implementing ElmEncoder
+        encoders: [Filetype, Drawing],
+        // generates types and decoders for types implementing ElmDecoder
+        decoders: [Filetype, Drawing],
+        // generates types and functions for forming queries for types implementing ElmQuery
+        queries: [Query],
+        // generates types and functions for forming queries for types implementing ElmQueryField
         query_fields: [Size],
-    })
-    .unwrap();
+    }).unwrap();
     let output = String::from_utf8(target).unwrap();
     println!("{}", output);
 }
@@ -169,6 +173,8 @@ queryFieldEncoderSize var =
 
 ```
 
+## Functionality
+
 ### Cargo features
 - `derive`: Activated by default. Enables deriving the `Elm` and `ElmEncode` traits.
 - `serde`: Enables compatibility with many of serde's attributes. (`serde v1`)
@@ -178,24 +184,27 @@ queryFieldEncoderSize var =
 
 ### Serde compatibility
 The `serde` feature enables compatibility with serde attributes. Currently the following attributes are supported:
+
 #### Container attributes
 - rename_all
 - tag
 - tag & content
 - untagged
 - transparent
+
 #### Variant attributes
 - rename
 - rename_all
 - skip
 - other
+
 #### Field attributes
 - rename
 - skip
 
 ### 0.2.0
 - [x] Generate Elm types with the `Elm` trait and derive macro
-- [x] Generate JSON encoders and decoders with the `ElmEncode` trait and derive macro
+- [x] Generate JSON encoders and decoders with the `ElmEncode` and `ElmDecode` traits and derive macros
 - [x] Basic generic support
 - [x] Compatibility with most serde attributes
 - [x] Support for simple queries
@@ -232,7 +241,5 @@ enum Enum2 {
 ```
 will cause an error in Elm due to `Variant` being ambiguous.
 
-### License
-Licensed under either one of
-- Apache License, Version 2.0
-- The MIT License
+## License
+Licensed under Mozilla Public License Version 2.0

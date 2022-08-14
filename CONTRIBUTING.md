@@ -5,8 +5,8 @@ cargo +nightly fmt
 ```
 
 ### Testing
-The tests use optional dependencies, so `--all-features` is needed. At the moment the test for forms requires manual interaction by opening a browser so it's ignored. The tests use `elm repl` so Elm has to be installed. The Elm repl doesn't appreciate being run multiple times in parallel so `--test-threads 1` is necessary as well.
+The tests use optional dependencies, so `--all-features` is needed. The tests use `elm repl` so Elm has to be installed.
 
 ```console
-cargo test --all-features -- --test-threads 1
+cargo test --all-features
 ```

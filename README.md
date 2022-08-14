@@ -1,10 +1,11 @@
+# elm_rs
 Automatically generate type definitions and functions for your Elm frontend from your Rust backend types, making it easy to keep the two in sync. Currently supports generating
 - Elm types with the `Elm` trait and derive macro
 - JSON encoders with the `ElmEncode` trait and derive macro, compatible with `serde_json`
 - JSON decoders with the `ElmDecode` trait and derive macro, compatible with `serde_json`
 - URL query encoders with the `ElmQuery` and `ElmQueryField` traits and derive macros
 
-### Usage
+## Usage
 For example, the following code
 ```rust
 use elm_rs::{Elm, ElmEncode, ElmDecode, ElmQuery, ElmQueryField};
@@ -155,7 +156,9 @@ type alias Query =
 
 
 urlEncodeQuery : Query -> List Url.Builder.QueryParameter
+urlEncodeQuery struct =
     [ Url.Builder.int "page" (identity struct.page), Url.Builder.string "thumbnail_size" (queryFieldEncoderSize struct.thumbnailSize) ]
+
 
 type Size
     = Small
@@ -163,12 +166,14 @@ type Size
 
 
 queryFieldEncoderSize : Size -> String
-queryFieldEncoderSize var = case var of
-                Small -> "Small"
-                Large -> "Large"
-
+queryFieldEncoderSize var =
+    case var of
+        Small -> "Small"
+        Large -> "Large"
 
 ```
+
+## Functionality
 
 ### Cargo features
 - `derive`: Activated by default. Enables deriving the `Elm` and `ElmEncode` traits.
@@ -179,17 +184,20 @@ queryFieldEncoderSize var = case var of
 
 ### Serde compatibility
 The `serde` feature enables compatibility with serde attributes. Currently the following attributes are supported:
+
 #### Container attributes
 - rename_all
 - tag
 - tag & content
 - untagged
 - transparent
+
 #### Variant attributes
 - rename
 - rename_all
 - skip
 - other
+
 #### Field attributes
 - rename
 - skip
@@ -233,7 +241,5 @@ enum Enum2 {
 ```
 will cause an error in Elm due to `Variant` being ambiguous.
 
-### License
-Licensed under either one of
-- Apache License, Version 2.0
-- The MIT License
+## License
+Licensed under Mozilla Public License Version 2.0
