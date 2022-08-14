@@ -1,11 +1,10 @@
 //! Derive macro for ElmQuery.
 
+use crate::{EnumVariantKind, Intermediate, TypeInfo};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
-
-use crate::{EnumVariantKind, Intermediate, TypeInfo};
 
 pub fn derive(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);

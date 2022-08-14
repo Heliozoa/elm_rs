@@ -1,7 +1,6 @@
 //! Contains the `ElmEncode` trait.
 
 use crate::Elm;
-
 #[cfg(feature = "derive")]
 pub use elm_rs_derive::ElmEncode;
 

@@ -1,3 +1,5 @@
+use crate::{Elm, ElmDecode, ElmEncode};
+use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
     cell::{Cell, RefCell},
@@ -9,9 +11,6 @@ use std::{
     sync::{atomic::*, Arc, Mutex, RwLock},
     time::{Duration, SystemTime},
 };
-
-use crate::{Elm, ElmDecode, ElmEncode};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Elm, ElmEncode, ElmDecode)]
 struct Types<T: Copy + Hash + Eq> {
