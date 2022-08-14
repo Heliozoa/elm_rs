@@ -242,4 +242,4 @@ enum Enum2 {
 will cause an error in Elm due to `Variant` being ambiguous.
 
 ## License
-Licensed under Mozilla Public License Version 2.0
+Licensed under the Mozilla Public License Version 2.0.

@@ -180,9 +180,9 @@ impl StructField {
         self.ident.to_string().to_lower_camel_case()
     }
 
-    #[cfg(feature = "json")]
+    #[cfg(any(feature = "json", feature = "query"))]
     fn name_encode(&self, container_attributes: &ContainerAttributes) -> String {
-        // rename during Rust serialization = needs rename during Elm deserialization
+        // rename during Rust deserialization = needs rename during Elm encoding
         // explicit rename has priority
         #[cfg(feature = "serde")]
         if let Some(rename) = self
@@ -191,7 +191,7 @@ impl StructField {
             .as_ref()
             .or(self.serde_attributes.rename_deserialize.as_ref())
         {
-            rename.to_string()
+            rename.clone()
         } else if let Some(rename_all) = container_attributes
             .serde
             .rename_all
@@ -205,9 +205,9 @@ impl StructField {
         self.ident.to_string()
     }
 
-    #[cfg(feature = "json")]
+    #[cfg(any(feature = "json", feature = "query"))]
     fn name_decode(&self, container_attributes: &ContainerAttributes) -> String {
-        // rename during Rust deserialization = needs rename during Elm serialization
+        // rename during Rust serialization = needs rename during Elm decoding
         // explicit rename has priority
         #[cfg(feature = "serde")]
         if let Some(rename) = self
@@ -266,7 +266,7 @@ impl EnumVariant {
         self.ident.to_string().to_pascal_case().into()
     }
 
-    #[cfg(feature = "json")]
+    #[cfg(any(feature = "json", feature = "query"))]
     fn name_encode(&self, container_attributes: &ContainerAttributes) -> String {
         // rename during Rust deserialization = needs rename during Elm encoding
         // explicit rename has priority
@@ -291,7 +291,7 @@ impl EnumVariant {
         self.ident.to_string()
     }
 
-    #[cfg(feature = "json")]
+    #[cfg(any(feature = "json", feature = "query"))]
     fn name_decode(&self, container_attributes: &ContainerAttributes) -> String {
         // rename during Rust serialization = needs rename during Elm decoding
         // explicit rename has priority
