@@ -1,4 +1,4 @@
-use crate::{Elm, ElmDecode, ElmEncode, ElmQuery};
+use crate::{Elm, ElmDecode, ElmEncode, ElmQuery, ElmQueryField};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fmt::Debug,
@@ -109,31 +109,48 @@ s
     return serde_json::from_str(&unescaped).unwrap();
 }
 
-fn test_query<T: Elm + ElmEncode + ElmDecode + ElmQuery + Serialize>(val: T, expected: &str) {
+fn test_query<
+    T: Elm + ElmEncode + ElmDecode + ElmQuery + Serialize,
+    U: Elm + ElmEncode + ElmDecode + ElmQueryField + Serialize,
+>(
+    val: T,
+    expected: &str,
+) {
     let json = serde_json::to_string(&val).unwrap().replace("\"", "\\\"");
+
     let decoder_type = T::decoder_type();
     let elm_type = T::elm_definition().unwrap();
     let query = T::elm_query();
     let query_function = format!("urlEncode{}", T::elm_type());
     let decoder = T::decoder_definition().unwrap();
 
+    let u_elm_type = U::elm_definition().unwrap();
+    let u_decoder = U::decoder_definition().unwrap();
+    let u_query = U::query_field_encoder_definition().unwrap();
+
     let input = format!(
         r#"
 import Json.Decode
 import Url.Builder
 
-{}
+{u_elm_type}
 
-{}
+{elm_type}
 
-{}
+{u_decoder}
 
-decoded = Json.Decode.decodeString {} "{}"
+{decoder}
+
+{u_query}
+
+{query}
+
+decoded = Json.Decode.decodeString {decoder_type} "{json}"
 
 
 s = case decoded of
     Ok value ->
-        Url.Builder.toQuery ({} value)
+        Url.Builder.toQuery ({query_function} value)
     Err err ->
         Json.Decode.errorToString err
 
@@ -143,7 +160,6 @@ s
 
 :exit
 "#,
-        elm_type, query, decoder, decoder_type, json, query_function
     );
     let output = run_repl(&input);
     assert_eq!(output, expected);

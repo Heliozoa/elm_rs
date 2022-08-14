@@ -1,9 +1,9 @@
 #![doc = include_str!("../README.md")]
 
 mod elm;
-mod elm_deserialize;
+mod elm_decode;
+mod elm_encode;
 mod elm_query;
-mod elm_serialize;
 #[cfg(test)]
 mod test;
 
@@ -12,9 +12,9 @@ extern crate self as elm_rs;
 
 pub use self::{
     elm::Elm,
-    elm_deserialize::ElmDecode,
+    elm_decode::ElmDecode,
+    elm_encode::ElmEncode,
     elm_query::{ElmQuery, ElmQueryField},
-    elm_serialize::ElmEncode,
 };
 
 #[macro_export]
@@ -22,29 +22,7 @@ pub use self::{
 ///
 /// # Example
 /// ```no_run
-/// use elm_rs::{Elm, ElmEncode, ElmDecode};
-///
-/// #[derive(Elm, ElmEncode, ElmDecode)]
-/// enum Filetype {
-///     Jpeg,
-///     Png,
-/// }
-///
-/// #[derive(Elm, ElmEncode, ElmDecode)]
-/// struct Drawing {
-///     title: String,
-///     authors: Vec<String>,
-///     filename: String,
-///     filetype: Filetype,
-/// }
-///
-/// let mut file = std::fs::File::create("Bindings.elm").unwrap();
-/// elm_rs::export!("Bindings", &mut file, {
-///     encoders: [Filetype, Drawing], // generates Elm type definitions and encoders (requires ElmEncoder)
-///     decoders: [Filetype, Drawing], // generates Elm type definitions and decoders (requires ElmDecoder)
-///     queries: [Filetype, Drawing],  // generates Elm type definitions and helper functions for forming queries (requires ElmQuery)
-/// // you can leave any of these sections out if you don't have anything to put there
-/// }).unwrap();
+#[doc = include_str!("../examples/example.rs")]
 /// ```
 macro_rules! export {
     ($name: expr, $target: expr, {
@@ -56,6 +34,9 @@ macro_rules! export {
         )?
         $(
             queries:    [ $($query: ty),*    $(,)? ] $(,)?
+        )?
+        $(
+            query_fields:    [ $($query_field: ty),*    $(,)? ] $(,)?
         )?
     }) => {
         {
@@ -113,8 +94,18 @@ import Url.Builder
                             ::std::writeln!(target, "{}\n", elm_definition)?;
                         }
                     }
-                    if let ::std::option::Option::Some(decoder_definition) = <$query as $crate::ElmQuery>::elm_query() {
-                        ::std::writeln!(target, "{}\n", decoder_definition)?;
+                    let query_definition = <$query as $crate::ElmQuery>::elm_query();
+                    ::std::writeln!(target, "{}\n", query_definition)?;
+                )*)?
+                $($(
+                    if !generated_elm_definitions.contains(stringify!($query_field)) {
+                        generated_elm_definitions.insert(stringify!($query_field));
+                        if let ::std::option::Option::Some(elm_definition) = <$query_field as $crate::Elm>::elm_definition() {
+                            ::std::writeln!(target, "{}\n", elm_definition)?;
+                        }
+                    }
+                    if let Some(query_field_encoder_definition) = <$query_field as $crate::ElmQueryField>::query_field_encoder_definition() {
+                        ::std::writeln!(target, "{}\n", query_field_encoder_definition)?;
                     }
                 )*)?
                 ::std::result::Result::Ok(())

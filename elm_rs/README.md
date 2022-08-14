@@ -5,8 +5,9 @@ Automatically generate type definitions and functions for your Elm frontend from
 
 ### Usage
 For example, the following code
+<!-- Keep up to date with ./examples/example.rs -->
 ```rust
-use elm_rs::{Elm, ElmEncode, ElmDecode};
+use elm_rs::{Elm, ElmDecode, ElmEncode, ElmQuery, ElmQueryField};
 
 #[derive(Elm, ElmEncode, ElmDecode)]
 enum Filetype {
@@ -22,15 +23,29 @@ struct Drawing {
     filetype: Filetype,
 }
 
+#[derive(Elm, ElmQuery)]
+struct Query {
+    page: usize,
+    thumbnail_size: Size,
+}
+
+#[derive(Elm, ElmQueryField)]
+enum Size {
+    Small,
+    Large,
+}
+
 fn main() {
-    // the target would typically be a file
+    // the target would typically be a file, here we print the generated code instead
     let mut target = vec![];
     // elm_rs provides a macro for conveniently creating an Elm module with everything needed
     elm_rs::export!("Bindings", &mut target, {
-         both: [Filetype, Drawing], // generates both Elm encoders and decoders
-         encoders: [], // generates only Elm encoders
-         decoders: [], // you can leave any of these sections out if you don't have anything to put there
-    }).unwrap();
+        encoders: [Filetype, Drawing], // generates Elm type definitions and encoders (requires ElmEncoder)
+        decoders: [Filetype, Drawing], // generates Elm type definitions and decoders (requires ElmDecoder)
+        queries: [Query],  // generates Elm type definitions and helper functions for forming queries (requires ElmQuery)
+        query_fields: [Size],
+    })
+    .unwrap();
     let output = String::from_utf8(target).unwrap();
     println!("{}", output);
 }
@@ -50,14 +65,6 @@ import Json.Encode
 import Url.Builder
 
 
-resultDecoder : Json.Decode.Decoder e -> Json.Decode.Decoder t -> Json.Decode.Decoder (Result e t)
-resultDecoder errDecoder okDecoder =
-    Json.Decode.oneOf
-        [ Json.Decode.map Ok (Json.Decode.field "Ok" okDecoder)
-        , Json.Decode.map Err (Json.Decode.field "Err" errDecoder)
-        ]
-
-
 resultEncoder : (e -> Json.Encode.Value) -> (t -> Json.Encode.Value) -> (Result e t -> Json.Encode.Value)
 resultEncoder errEncoder okEncoder enum =
     case enum of
@@ -65,6 +72,14 @@ resultEncoder errEncoder okEncoder enum =
             Json.Encode.object [ ( "Ok", okEncoder inner ) ]
         Err inner ->
             Json.Encode.object [ ( "Err", errEncoder inner ) ]
+
+
+resultDecoder : Json.Decode.Decoder e -> Json.Decode.Decoder t -> Json.Decode.Decoder (Result e t)
+resultDecoder errDecoder okDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map Ok (Json.Decode.field "Ok" okDecoder)
+        , Json.Decode.map Err (Json.Decode.field "Err" errDecoder)
+        ]
 
 
 type Filetype
@@ -79,6 +94,24 @@ filetypeEncoder enum =
             Json.Encode.string "Jpeg"
         Png ->
             Json.Encode.string "Png"
+
+type alias Drawing =
+    { title : String
+    , authors : List (String)
+    , filename : String
+    , filetype : Filetype
+    }
+
+
+drawingEncoder : Drawing -> Json.Encode.Value
+drawingEncoder struct =
+    Json.Encode.object
+        [ ( "title", (Json.Encode.string) struct.title )
+        , ( "authors", (Json.Encode.list (Json.Encode.string)) struct.authors )
+        , ( "filename", (Json.Encode.string) struct.filename )
+        , ( "filetype", (filetypeEncoder) struct.filetype )
+        ]
+
 
 filetypeDecoder : Json.Decode.Decoder Filetype
 filetypeDecoder = 
@@ -103,24 +136,6 @@ filetypeDecoder =
                 )
         ]
 
-type alias Drawing =
-    { title : String
-    , authors : List (String)
-    , filename : String
-    , filetype : Filetype
-    }
-
-
-drawingEncoder : Drawing -> Json.Encode.Value
-drawingEncoder struct =
-    Json.Encode.object
-        [ ( "title", (Json.Encode.string) struct.title )
-        , ( "authors", (Json.Encode.list (Json.Encode.string)) struct.authors )
-        , ( "filename", (Json.Encode.string) struct.filename )
-        , ( "filetype", (filetypeEncoder) struct.filetype )
-        ]
-
-
 drawingDecoder : Json.Decode.Decoder Drawing
 drawingDecoder =
     Json.Decode.succeed Drawing
@@ -129,6 +144,28 @@ drawingDecoder =
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "filename" (Json.Decode.string)))
         |> Json.Decode.andThen (\x -> Json.Decode.map x (Json.Decode.field "filetype" (filetypeDecoder)))
 
+
+type alias Query =
+    { page : Int
+    , thumbnailSize : Size
+    }
+
+
+urlEncodeQuery : Query -> List Url.Builder.QueryParameter
+urlEncodeQuery struct =
+    [ Url.Builder.int "page" (identity struct.page), Url.Builder.string "thumbnail_size" (queryFieldEncoderSize struct.thumbnailSize) ]
+
+
+type Size
+    = Small
+    | Large
+
+
+queryFieldEncoderSize : Size -> String
+queryFieldEncoderSize var =
+    case var of
+        Small -> "Small"
+        Large -> "Large"
 
 ```
 

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use elm_rs::{Elm, ElmDecode, ElmEncode};
+use elm_rs::{Elm, ElmDecode, ElmEncode, ElmQuery, ElmQueryField};
 
 #[derive(Elm, ElmEncode, ElmDecode)]
 enum Filetype {
@@ -16,14 +16,27 @@ struct Drawing {
     filetype: Filetype,
 }
 
+#[derive(Elm, ElmQuery)]
+struct Query {
+    page: usize,
+    thumbnail_size: Size,
+}
+
+#[derive(Elm, ElmQueryField)]
+enum Size {
+    Small,
+    Large,
+}
+
 fn main() {
     // the target would typically be a file
     let mut target = vec![];
     // elm_rs provides a macro for conveniently creating an Elm module with everything needed
     elm_rs::export!("Bindings", &mut target, {
-         both: [Filetype, Drawing], // generates both Elm encoders and decoders
-         encoders: [], // generates only Elm encoders
-         decoders: [], // you can leave any of these sections out if you don't have anything to put there
+        encoders: [Filetype, Drawing], // generates Elm type definitions and encoders (requires ElmEncoder)
+        decoders: [Filetype, Drawing], // generates Elm type definitions and decoders (requires ElmDecoder)
+        queries: [Query],  // generates Elm type definitions and helper functions for forming queries (requires ElmQuery)
+        query_fields: [Size],
     })
     .unwrap();
     let output = String::from_utf8(target).unwrap();

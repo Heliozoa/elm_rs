@@ -175,11 +175,11 @@ fn struct_named(
     let mut field_encoders = vec![];
     for field in fields {
         let field_name = field.name_elm();
-        let field_name_serialize = field.name_serialize(container_attributes);
+        let field_name_encode = field.name_encode(container_attributes);
         let ty = &field.ty;
         field_encoders.push(
-            quote! {::std::format!("( \"{field_name_serialize}\", ({encoder}) struct.{field_name} )",
-            field_name_serialize = #field_name_serialize,
+            quote! {::std::format!("( \"{field_name_encode}\", ({encoder}) struct.{field_name} )",
+            field_name_encode = #field_name_encode,
             encoder = <#ty as ::elm_rs::ElmEncode>::encoder_type(),
             field_name = #field_name)},
         )
@@ -233,19 +233,19 @@ fn enum_external(
         }
 
         let elm_name = variant.name_elm();
-        let elm_name_serialize = variant.name_serialize(container_attributes);
+        let elm_name_encode = variant.name_encode(container_attributes);
 
         let encoder = match &variant.variant {
-            EnumVariantKind::Unit => enum_variant_unit_external(&elm_name, &elm_name_serialize),
+            EnumVariantKind::Unit => enum_variant_unit_external(&elm_name, &elm_name_encode),
             EnumVariantKind::Newtype(inner) => {
-                enum_variant_newtype_external(&elm_name, &elm_name_serialize, inner)
+                enum_variant_newtype_external(&elm_name, &elm_name_encode, inner)
             }
             EnumVariantKind::Tuple(types) => {
-                enum_variant_tuple_external(&elm_name, &elm_name_serialize, types)
+                enum_variant_tuple_external(&elm_name, &elm_name_encode, types)
             }
             EnumVariantKind::Struct(fields) => enum_variant_struct_external(
                 &elm_name,
-                &elm_name_serialize,
+                &elm_name_encode,
                 fields,
                 container_attributes,
             ),
@@ -294,11 +294,11 @@ fn enum_internal(
         }
 
         let elm_name = variant.name_elm();
-        let elm_name_serialize = variant.name_serialize(container_attributes);
+        let elm_name_encode = variant.name_encode(container_attributes);
 
         let encoder = match &variant.variant {
             EnumVariantKind::Unit => {
-                enum_variant_unit_internal_or_adjacent(tag, &elm_name, &elm_name_serialize)
+                enum_variant_unit_internal_or_adjacent(tag, &elm_name, &elm_name_encode)
             }
             EnumVariantKind::Newtype(_) => {
                 return Err(syn::Error::new(
@@ -315,7 +315,7 @@ fn enum_internal(
             EnumVariantKind::Struct(fields) => enum_variant_struct_internal(
                 tag,
                 &elm_name,
-                &elm_name_serialize,
+                &elm_name_encode,
                 fields,
                 container_attributes,
             ),
@@ -367,23 +367,23 @@ fn enum_adjacent(
         }
 
         let elm_name = variant.name_elm();
-        let elm_name_serialize = variant.name_serialize(container_attributes);
+        let elm_name_encode = variant.name_encode(container_attributes);
 
         let encoder = match &variant.variant {
             EnumVariantKind::Unit => {
-                enum_variant_unit_internal_or_adjacent(tag, &elm_name, &elm_name_serialize)
+                enum_variant_unit_internal_or_adjacent(tag, &elm_name, &elm_name_encode)
             }
             EnumVariantKind::Newtype(inner) => {
-                enum_variant_newtype_adjacent(tag, content, &elm_name, &elm_name_serialize, inner)
+                enum_variant_newtype_adjacent(tag, content, &elm_name, &elm_name_encode, inner)
             }
             EnumVariantKind::Tuple(types) => {
-                enum_variant_tuple_adjacent(tag, content, &elm_name, &elm_name_serialize, types)
+                enum_variant_tuple_adjacent(tag, content, &elm_name, &elm_name_encode, types)
             }
             EnumVariantKind::Struct(fields) => enum_variant_struct_adjacent(
                 tag,
                 content,
                 &elm_name,
-                &elm_name_serialize,
+                &elm_name_encode,
                 fields,
                 container_attributes,
             ),
@@ -469,12 +469,12 @@ fn enum_untagged(
 ///     Unit,
 /// }
 /// "\"Unit\""
-fn enum_variant_unit_external(variant_name: &str, variant_name_serialize: &str) -> TokenStream2 {
+fn enum_variant_unit_external(variant_name: &str, variant_name_encode: &str) -> TokenStream2 {
     quote! {::std::format!("\
     {variant_name} ->
-            Json.Encode.string \"{variant_name_serialize}\"",
+            Json.Encode.string \"{variant_name_encode}\"",
         variant_name = #variant_name,
-        variant_name_serialize = #variant_name_serialize,
+        variant_name_encode = #variant_name_encode,
     )}
 }
 
@@ -485,14 +485,14 @@ fn enum_variant_unit_external(variant_name: &str, variant_name_serialize: &str) 
 /// "{\"Newtype\":0}"
 fn enum_variant_newtype_external(
     variant_name: &str,
-    variant_name_serialize: &str,
+    variant_name_encode: &str,
     inner_type: &TokenStream2,
 ) -> TokenStream2 {
     quote! { format!("\
 {variant_name} inner ->
-            Json.Encode.object [ ( \"{variant_name_serialize}\", {encoder} inner ) ]",
+            Json.Encode.object [ ( \"{variant_name_encode}\", {encoder} inner ) ]",
         variant_name = #variant_name,
-        variant_name_serialize = #variant_name_serialize,
+        variant_name_encode = #variant_name_encode,
         encoder = <#inner_type as ::elm_rs::ElmEncode>::encoder_type(),
     )}
 }
@@ -504,13 +504,13 @@ fn enum_variant_newtype_external(
 /// "{\"Tuple\":[0,0]}"
 fn enum_variant_tuple_external(
     variant_name: &str,
-    variant_name_serialize: &str,
+    variant_name_encode: &str,
     tuple_types: &[TokenStream2],
 ) -> TokenStream2 {
     let idx: Vec<usize> = (0..tuple_types.len()).collect();
     quote! {::std::format!("\
 {variant_name} {fields} ->
-            Json.Encode.object [ ( \"{variant_name_serialize}\", Json.Encode.list identity [ {encoders} ] ) ]",
+            Json.Encode.object [ ( \"{variant_name_encode}\", Json.Encode.list identity [ {encoders} ] ) ]",
         variant_name = #variant_name,
         fields = (
             &[
@@ -518,7 +518,7 @@ fn enum_variant_tuple_external(
                 ),*
             ]
         ).join(" "),
-        variant_name_serialize = #variant_name_serialize,
+        variant_name_encode = #variant_name_encode,
         encoders = (
             &[
                 #(::std::format!("{} t{}",
@@ -537,7 +537,7 @@ fn enum_variant_tuple_external(
 /// "{\"Struct\":{\"a\":0}}"
 fn enum_variant_struct_external(
     variant_name: &str,
-    variant_name_serialize: &str,
+    variant_name_encode: &str,
     fields: &[StructField],
     container_attributes: &ContainerAttributes,
 ) -> TokenStream2 {
@@ -547,13 +547,13 @@ fn enum_variant_struct_external(
         .unzip();
     let field_names_serialize = fields
         .iter()
-        .map(|field| field.name_serialize(container_attributes));
+        .map(|field| field.name_encode(container_attributes));
 
     quote! {::std::format!("\
 {variant_name} {{ {fields} }} ->
-            Json.Encode.object [ ( \"{variant_name_serialize}\", Json.Encode.object [ {encoders} ] ) ]",
+            Json.Encode.object [ ( \"{variant_name_encode}\", Json.Encode.object [ {encoders} ] ) ]",
         variant_name = #variant_name,
-        variant_name_serialize = #variant_name_serialize,
+        variant_name_encode = #variant_name_encode,
         fields =  (
             &[
                 #(::std::format!("{}", #field_names,
@@ -591,14 +591,14 @@ fn enum_variant_struct_external(
 fn enum_variant_unit_internal_or_adjacent(
     tag: &str,
     variant_name: &str,
-    variant_name_serialize: &str,
+    variant_name_encode: &str,
 ) -> TokenStream2 {
     quote! {::std::format!("\
 {variant_name} ->
-            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_serialize}\" ) ]",
+            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_encode}\" ) ]",
         variant_name = #variant_name,
         tag = #tag,
-        variant_name_serialize = #variant_name_serialize,
+        variant_name_encode = #variant_name_encode,
     )}
 }
 
@@ -612,7 +612,7 @@ fn enum_variant_unit_internal_or_adjacent(
 fn enum_variant_struct_internal(
     tag: &str,
     variant_name: &str,
-    variant_name_serialize: &str,
+    variant_name_encode: &str,
     fields: &[StructField],
     container_attributes: &ContainerAttributes,
 ) -> TokenStream2 {
@@ -622,17 +622,17 @@ fn enum_variant_struct_internal(
         .unzip();
     let field_names_serialize = fields
         .iter()
-        .map(|field| field.name_serialize(container_attributes));
+        .map(|field| field.name_encode(container_attributes));
 
     quote! {::std::format!("\
 {variant_name} {{ {fields} }} ->
-            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_serialize}\" ), {encoders} ]",
+            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_encode}\" ), {encoders} ]",
         variant_name = #variant_name,
         fields = (&[
                 #(#field_names),*
         ]).join(", "),
         tag = #tag,
-        variant_name_serialize = #variant_name_serialize,
+        variant_name_encode = #variant_name_encode,
         encoders = (
             &[
                 #(::std::format!("( \"{}\", {} {} )",
@@ -660,16 +660,16 @@ fn enum_variant_newtype_adjacent(
     tag: &str,
     content: &str,
     variant_name: &str,
-    variant_name_serialize: &str,
+    variant_name_encode: &str,
     inner_type: &TokenStream2,
 ) -> TokenStream2 {
     quote! { format!("\
     {variant_name} inner ->
-            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_serialize}\"), ( \"{content}\", {encoder} inner ) ]",
+            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_encode}\"), ( \"{content}\", {encoder} inner ) ]",
         variant_name = #variant_name,
         tag = #tag,
         content = #content,
-        variant_name_serialize = #variant_name_serialize,
+        variant_name_encode = #variant_name_encode,
         encoder = <#inner_type as ::elm_rs::ElmEncode>::encoder_type(),
     )}
 }
@@ -685,14 +685,14 @@ fn enum_variant_tuple_adjacent(
     tag: &str,
     content: &str,
     variant_name: &str,
-    variant_name_serialize: &str,
+    variant_name_encode: &str,
     tuple_types: &[TokenStream2],
 ) -> TokenStream2 {
     let idx: Vec<usize> = (0..tuple_types.len()).collect();
 
     quote! { format!("\
     {variant_name} {params} ->
-            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_serialize}\"), ( \"{content}\", Json.Encode.list identity [ {encoders} ] ) ]",
+            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_encode}\"), ( \"{content}\", Json.Encode.list identity [ {encoders} ] ) ]",
         variant_name = #variant_name,
         params = (
             &[
@@ -702,7 +702,7 @@ fn enum_variant_tuple_adjacent(
         ).join(" "),
         tag = #tag,
         content = #content,
-        variant_name_serialize = #variant_name_serialize,
+        variant_name_encode = #variant_name_encode,
         encoders = (
             &[
                 #(::std::format!("{} t{}", <#tuple_types as ::elm_rs::ElmEncode>::encoder_type(), #idx)
@@ -723,7 +723,7 @@ fn enum_variant_struct_adjacent(
     tag: &str,
     content: &str,
     variant_name: &str,
-    variant_name_serialize: &str,
+    variant_name_encode: &str,
     fields: &[StructField],
     container_attributes: &ContainerAttributes,
 ) -> TokenStream2 {
@@ -733,11 +733,11 @@ fn enum_variant_struct_adjacent(
         .unzip();
     let field_names_serialize = fields
         .iter()
-        .map(|field| field.name_serialize(container_attributes));
+        .map(|field| field.name_encode(container_attributes));
 
     quote! { format!("\
     {variant_name} {{ {fields} }} ->
-            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_serialize}\"), ( \"{content}\", Json.Encode.object [ {encoders} ] ) ]",
+            Json.Encode.object [ ( \"{tag}\", Json.Encode.string \"{variant_name_encode}\"), ( \"{content}\", Json.Encode.object [ {encoders} ] ) ]",
         variant_name = #variant_name,
         fields = (
             &[
@@ -746,7 +746,7 @@ fn enum_variant_struct_adjacent(
         ).join(", "),
         tag = #tag,
         content = #content,
-        variant_name_serialize = #variant_name_serialize,
+        variant_name_encode = #variant_name_encode,
         encoders = (
             &[
                 #(::std::format!("( \"{}\", {} {} )",
@@ -847,7 +847,7 @@ fn enum_variant_struct_untagged(
         .unzip();
     let field_names_serialize = fields
         .iter()
-        .map(|field| field.name_serialize(container_attributes));
+        .map(|field| field.name_encode(container_attributes));
     quote! {::std::format!("\
 {variant_name} {{ {fields} }} ->
             Json.Encode.object [ {encoders} ]",

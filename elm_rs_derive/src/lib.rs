@@ -3,11 +3,13 @@
 mod attributes;
 mod elm;
 #[cfg(feature = "json")]
-mod elm_deserialize;
+mod elm_decode;
+#[cfg(feature = "json")]
+mod elm_encode;
 #[cfg(feature = "query")]
 mod elm_query;
-#[cfg(feature = "json")]
-mod elm_serialize;
+#[cfg(feature = "query")]
+mod elm_query_field;
 
 use self::attributes::{ContainerAttributes, FieldAttributes, VariantAttributes};
 use heck::{ToLowerCamelCase, ToPascalCase};
@@ -30,14 +32,14 @@ pub fn derive_elm(input: TokenStream) -> TokenStream {
 #[cfg(feature = "json")]
 #[proc_macro_derive(ElmEncode)]
 pub fn derive_elm_serialize(input: TokenStream) -> TokenStream {
-    elm_serialize::derive(input)
+    elm_encode::derive(input)
 }
 
 /// Derive `ElmDecode`.
 #[cfg(feature = "json")]
 #[proc_macro_derive(ElmDecode)]
 pub fn derive_elm_deserialize(input: TokenStream) -> TokenStream {
-    elm_deserialize::derive(input)
+    elm_decode::derive(input)
 }
 
 /// Derive `ElmQuery`.
@@ -45,6 +47,13 @@ pub fn derive_elm_deserialize(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(ElmQuery)]
 pub fn derive_elm_query(input: TokenStream) -> TokenStream {
     elm_query::derive(input)
+}
+
+/// Derive `ElmQueryField`.
+#[cfg(feature = "query")]
+#[proc_macro_derive(ElmQueryField)]
+pub fn derive_elm_query_field(input: TokenStream) -> TokenStream {
+    elm_query_field::derive(input)
 }
 
 /// Intermediate representation of the derive input for more convenient handling.
@@ -172,7 +181,7 @@ impl StructField {
     }
 
     #[cfg(feature = "json")]
-    fn name_serialize(&self, container_attributes: &ContainerAttributes) -> String {
+    fn name_encode(&self, container_attributes: &ContainerAttributes) -> String {
         // rename during Rust serialization = needs rename during Elm deserialization
         // explicit rename has priority
         #[cfg(feature = "serde")]
@@ -197,7 +206,7 @@ impl StructField {
     }
 
     #[cfg(feature = "json")]
-    fn name_deserialize(&self, container_attributes: &ContainerAttributes) -> String {
+    fn name_decode(&self, container_attributes: &ContainerAttributes) -> String {
         // rename during Rust deserialization = needs rename during Elm serialization
         // explicit rename has priority
         #[cfg(feature = "serde")]
@@ -258,8 +267,8 @@ impl EnumVariant {
     }
 
     #[cfg(feature = "json")]
-    fn name_serialize(&self, container_attributes: &ContainerAttributes) -> String {
-        // rename during Rust serialization = needs rename during Elm deserialization
+    fn name_encode(&self, container_attributes: &ContainerAttributes) -> String {
+        // rename during Rust deserialization = needs rename during Elm encoding
         // explicit rename has priority
         #[cfg(feature = "serde")]
         if let Some(rename) = self
@@ -283,8 +292,8 @@ impl EnumVariant {
     }
 
     #[cfg(feature = "json")]
-    fn name_deserialize(&self, container_attributes: &ContainerAttributes) -> String {
-        // rename during Rust deserialization = needs rename during Elm serialization
+    fn name_decode(&self, container_attributes: &ContainerAttributes) -> String {
+        // rename during Rust serialization = needs rename during Elm decoding
         // explicit rename has priority
         #[cfg(feature = "serde")]
         if let Some(rename) = self

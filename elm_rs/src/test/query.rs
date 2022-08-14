@@ -1,36 +1,37 @@
-use crate::{Elm, ElmDecode, ElmEncode, ElmQuery};
+use crate::{Elm, ElmDecode, ElmEncode, ElmQuery, ElmQueryField};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode, ElmQuery)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmDecode, ElmEncode, ElmQuery)]
 struct Named {
     first: i32,
     second: String,
+    e: Enum,
 }
 
 #[test]
 fn query_struct() {
-    super::test_query(
+    super::test_query::<_, Enum>(
         Named {
             first: 123,
             second: "234".to_string(),
+            e: Enum::First,
         },
-        "?first=123&second=234",
+        "?first=123&second=234&e=First",
     );
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmEncode, ElmDecode, ElmQuery)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmDecode, ElmEncode, ElmQuery)]
+struct ContainsEnum {
+    e: Enum,
+}
+
+#[derive(Debug, PartialEq, Deserialize, Serialize, Elm, ElmDecode, ElmEncode, ElmQueryField)]
 enum Enum {
-    First { first: i32, second: String },
-    Second { third: i32, fourth: String },
+    First,
+    Second,
 }
 
 #[test]
 fn query_enum() {
-    super::test_query(
-        Enum::Second {
-            third: 123,
-            fourth: "234".to_string(),
-        },
-        "?third=123&fourth=234",
-    );
+    super::test_query::<_, Enum>(ContainsEnum { e: Enum::First }, "?e=First");
 }

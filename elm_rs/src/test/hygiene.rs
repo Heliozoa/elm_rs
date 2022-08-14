@@ -17,7 +17,8 @@ struct Drawing {
 fn hygiene() {
     let mut target = ::std::vec![];
     crate::elm_rs::export!("Bindings", &mut target, {
-        both: [Drawing, Filetype]
+        encoders: [Drawing, Filetype],
+        decoders: [Drawing, Filetype],
     })
     .unwrap();
 }
