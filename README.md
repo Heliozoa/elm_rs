@@ -1,4 +1,9 @@
 # elm_rs
+
+![Crates.io](https://img.shields.io/crates/v/elm_rs)
+![docs.rs](https://img.shields.io/docsrs/elm_rs)
+![Crates.io](https://img.shields.io/crates/l/elm_rs)
+
 Automatically generate type definitions and functions for your Elm frontend from your Rust backend types, making it easy to keep the two in sync. Currently supports generating
 - Elm types with the `Elm` trait and derive macro
 - JSON encoders with the `ElmEncode` trait and derive macro, compatible with `serde_json`
