@@ -1,8 +1,8 @@
 # elm_rs
 
-![Crates.io](https://img.shields.io/crates/v/elm_rs)
-![docs.rs](https://img.shields.io/docsrs/elm_rs)
-![Crates.io](https://img.shields.io/crates/l/elm_rs)
+[![Crates.io](https://img.shields.io/crates/v/elm_rs)](https://crates.io/crates/elm_rs)
+[![docs.rs](https://img.shields.io/docsrs/elm_rs)](https://docs.rs/elm_rs)
+[![Crates.io](https://img.shields.io/crates/l/elm_rs)](https://choosealicense.com/licenses/mpl-2.0/)
 
 Automatically generate type definitions and functions for your Elm frontend from your Rust backend types, making it easy to keep the two in sync. Currently supports generating
 - Elm types with the `Elm` trait and derive macro
