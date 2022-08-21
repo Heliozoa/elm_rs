@@ -246,5 +246,9 @@ enum Enum2 {
 ```
 will cause an error in Elm due to `Variant` being ambiguous.
 
+## Alternatives
+
+- Generate an OpenAPI spec from Rust with something like https://crates.io/crates/okapi and generate Elm code from the spec with something like https://openapi-generator.tech/.
+
 ## License
 Licensed under the Mozilla Public License Version 2.0.
