@@ -3,18 +3,26 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Elm, ElmEncode, ElmDecode, Serialize, Deserialize, PartialEq)]
 enum Enum1<T> {
-    Unit1,
-    Newtype1(T),
-    Tuple1(T, T),
-    Named1 { t: T },
+    Unit11,
+    Unit12,
+    Newtype11(T),
+    Newtype12(T),
+    Tuple11(T, T),
+    Tuple12(T, T),
+    Named11 { t: T },
+    Named12 { t: T },
 }
 
 #[derive(Debug, Elm, ElmEncode, ElmDecode, Serialize, Deserialize, PartialEq)]
 enum Enum2<T> {
-    Unit2,
-    Newtype2(T),
-    Tuple2(T, T),
-    Named2 { t: T },
+    Unit21,
+    Unit22,
+    Newtype21(T),
+    Newtype22(T),
+    Tuple21(T, T),
+    Tuple22(T, T),
+    Named21 { t: T },
+    Named22 { t: T },
 }
 
 #[derive(Debug, Elm, ElmEncode, ElmDecode, Serialize, Deserialize, PartialEq)]
@@ -33,21 +41,21 @@ struct Struct<T> {
 fn complex() {
     super::test_json_with_deps(
         Struct {
-            unit: Enum1::Unit1,
-            newtype: Enum1::Newtype1(vec![1, 2, 3, 4]),
-            tuple: Enum1::Tuple1(vec![1, 2, 3, 4], vec![1, 2, 3, 4]),
-            named: Enum1::Named1 {
+            unit: Enum1::Unit11,
+            newtype: Enum1::Newtype11(vec![1, 2, 3, 4]),
+            tuple: Enum1::Tuple11(vec![1, 2, 3, 4], vec![1, 2, 3, 4]),
+            named: Enum1::Named11 {
                 t: vec![1, 2, 3, 4],
             },
-            named_unit: Enum2::Named2 { t: Enum1::Unit1 },
-            named_newtype: Enum2::Named2 {
-                t: Enum1::Newtype1(vec![1, 2, 3, 4]),
+            named_unit: Enum2::Named21 { t: Enum1::Unit11 },
+            named_newtype: Enum2::Named21 {
+                t: Enum1::Newtype11(vec![1, 2, 3, 4]),
             },
-            named_tuple: Enum2::Named2 {
-                t: Enum1::Tuple1(vec![1, 2, 3, 4], vec![1, 2, 3, 4]),
+            named_tuple: Enum2::Named21 {
+                t: Enum1::Tuple11(vec![1, 2, 3, 4], vec![1, 2, 3, 4]),
             },
-            named_named: Enum2::Named2 {
-                t: Enum1::Named1 {
+            named_named: Enum2::Named21 {
+                t: Enum1::Named11 {
                     t: vec![1, 2, 3, 4],
                 },
             },
