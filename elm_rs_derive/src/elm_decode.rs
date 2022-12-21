@@ -261,11 +261,9 @@ fn enum_external(
         quote! {::std::format!("
         let
             {}
-        in", (
-                &[
+        in", (&[
                     #(#constructors),*
-                ]
-            ).join("\n            ")
+            ]).join("\n            ")
         )}
     };
 
@@ -362,7 +360,7 @@ _ ->
             {}
         in", (&[
                     #(#constructors),*
-            ]).join("\n        ")
+            ]).join("\n            ")
         )}
     };
 
@@ -467,7 +465,7 @@ _ ->
             {}
         in", (&[
                     #(#constructors),*
-            ]).join("\n        ")
+            ]).join("\n            ")
         )}
     };
 
@@ -544,11 +542,9 @@ fn enum_untagged(
         quote! {::std::format!("
         let
             {}
-        in", (
-                &[
+        in", (&[
                     #(#constructors),*
-                ]
-            ).join("\n        ")
+            ]).join("\n            ")
         )}
     };
 
