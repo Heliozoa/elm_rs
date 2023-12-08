@@ -14,6 +14,7 @@ mod enums_untagged;
 mod etc_serde;
 mod hygiene;
 mod query;
+mod regression;
 mod structs;
 mod structs_serde;
 mod types;
