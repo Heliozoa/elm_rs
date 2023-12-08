@@ -383,7 +383,7 @@ impl_builtin_container!(
     Option<T>,
     "Maybe",
     "Json.Decode.nullable",
-    "Maybe.withDefault Json.Encode.null << Maybe.map"
+    "Maybe.withDefault Json.Encode.null <| Maybe.map"
 );
 impl_builtin!(
     std::path::Path,
