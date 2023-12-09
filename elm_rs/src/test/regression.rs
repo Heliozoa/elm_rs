@@ -14,3 +14,28 @@ enum Msg {
 fn regression_2() {
     super::test_json(Msg::Unit1);
 }
+
+#[derive(Debug, Elm, ElmEncode, ElmDecode, Serialize, Deserialize, PartialEq)]
+
+enum E {
+    V { a: Option<i32> },
+}
+
+#[test]
+fn regression_4() {
+    super::test_json_with_deps(
+        E::V { a: Some(1234) },
+        &format!(
+            "\
+{}
+
+{}
+
+{}
+",
+            E::elm_definition().unwrap(),
+            E::encoder_definition().unwrap(),
+            E::decoder_definition().unwrap(),
+        ),
+    )
+}

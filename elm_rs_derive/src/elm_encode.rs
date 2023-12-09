@@ -562,7 +562,7 @@ fn enum_variant_struct_external(
         ).join(", "),
         encoders = (
             &[
-                #(::std::format!("( \"{}\", {} {} )",
+                #(::std::format!("( \"{}\", ({}) {} )",
                     #field_names_serialize,
                     <#tys as ::elm_rs::ElmEncode>::encoder_type(),
                     #field_names,
@@ -635,7 +635,7 @@ fn enum_variant_struct_internal(
         variant_name_encode = #variant_name_encode,
         encoders = (
             &[
-                #(::std::format!("( \"{}\", {} {} )",
+                #(::std::format!("( \"{}\", ({}) {} )",
                     #field_names_serialize,
                     <#tys>::encoder_type(),
                     #field_names,
@@ -749,7 +749,7 @@ fn enum_variant_struct_adjacent(
         variant_name_encode = #variant_name_encode,
         encoders = (
             &[
-                #(::std::format!("( \"{}\", {} {} )",
+                #(::std::format!("( \"{}\", ({}) {} )",
                     #field_names_serialize,
                     <#tys as ::elm_rs::ElmEncode>::encoder_type(),
                     #field_names,
@@ -860,7 +860,7 @@ fn enum_variant_struct_untagged(
         ).join(", "),
         encoders = (
             &[
-                #(::std::format!("( \"{}\", {} {} )",
+                #(::std::format!("( \"{}\", ({}) {} )",
                     #field_names_serialize,
                     <#tys as ::elm_rs::ElmEncode>::encoder_type(),
                     #field_names,
