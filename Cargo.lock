@@ -76,7 +76,7 @@ dependencies = [
 
 [[package]]
 name = "elm_rs"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "chrono",
  "elm_rs_derive",
@@ -89,7 +89,7 @@ dependencies = [
 
 [[package]]
 name = "elm_rs_derive"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "heck",
  "proc-macro2",
