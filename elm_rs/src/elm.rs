@@ -101,7 +101,7 @@ type alias Duration =
 
 impl<T: Elm, E: Elm> Elm for Result<T, E> {
     fn elm_type() -> String {
-        ::std::format!("Result {} {}", E::elm_type(), T::elm_type())
+        ::std::format!("Result ({}) ({})", E::elm_type(), T::elm_type())
     }
 
     fn elm_definition() -> Option<String> {

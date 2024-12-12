@@ -13,6 +13,7 @@ mod enums_internal;
 mod enums_untagged;
 mod etc_serde;
 mod hygiene;
+mod nested;
 mod query;
 mod regression;
 mod structs;
