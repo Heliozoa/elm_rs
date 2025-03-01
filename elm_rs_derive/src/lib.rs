@@ -68,8 +68,8 @@ struct Intermediate {
 
 impl Intermediate {
     // parses the input to an intermediate representation that's convenient to turn into the end result
-    fn parse(input: DeriveInput) -> Result<Self, syn::Error> {
-        let container_attributes = ContainerAttributes::parse(&input.attrs);
+    fn parse(input: DeriveInput) -> syn::Result<Self> {
+        let container_attributes = ContainerAttributes::parse(&input.attrs)?;
         let type_info = TypeInfo::parse(input.data, &container_attributes)?;
 
         let elm_type = input.ident.to_string().to_pascal_case();
@@ -232,7 +232,7 @@ impl StructField {
 
     fn parse(fields: FieldsNamed) -> Vec<Self> {
         let fields = fields.named.into_iter().map(|field| {
-            let field_attributes = FieldAttributes::parse(&field.attrs);
+            let field_attributes = FieldAttributes::parse(&field.attrs).unwrap();
             (field, field_attributes)
         });
         #[cfg(feature = "serde")]
@@ -316,9 +316,9 @@ impl EnumVariant {
         self.ident.to_string()
     }
 
-    fn parse(variant: Variant) -> Result<Self, syn::Error> {
+    fn parse(variant: Variant) -> syn::Result<Self> {
         let span = variant.span();
-        let variant_attributes = VariantAttributes::parse(&variant.attrs);
+        let variant_attributes = VariantAttributes::parse(&variant.attrs)?;
         let variant_kind = match variant.fields {
             Fields::Unit => EnumVariantKind::Unit,
             Fields::Unnamed(unnamed) if unnamed.unnamed.len() == 1 => EnumVariantKind::Newtype(

@@ -22,7 +22,7 @@ query = []
 serde = []
 
 [dependencies]
-heck = "0.4.0"
+heck = "0.5.0"
 proc-macro2 = "1.0.36"
 quote = "1.0.15"
-syn = "1.0.86"
+syn = "2.0.98"

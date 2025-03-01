@@ -1,6 +1,6 @@
 //! Parsing macro attributes.
 
-use syn::{Attribute, Meta};
+use syn::Attribute;
 
 #[derive(Default)]
 pub struct ContainerAttributes {
@@ -9,21 +9,15 @@ pub struct ContainerAttributes {
 }
 
 impl ContainerAttributes {
-    pub fn parse(attrs: &[Attribute]) -> Self {
+    pub fn parse(attrs: &[Attribute]) -> syn::Result<Self> {
         let mut attributes = Self::default();
         for attr in attrs {
-            if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
-                /* todo
-                if meta_list.path.is_ident("elm_rs") {
-                }
-                */
-                #[cfg(feature = "serde")]
-                if meta_list.path.is_ident("serde") {
-                    attributes.serde.parse(meta_list);
-                }
+            #[cfg(feature = "serde")]
+            if attr.path().is_ident("serde") {
+                attributes.serde.parse(attr)?;
             }
         }
-        attributes
+        Ok(attributes)
     }
 }
 
@@ -34,23 +28,17 @@ pub struct VariantAttributes {
 }
 
 impl VariantAttributes {
-    pub fn parse(attrs: &[Attribute]) -> Self {
+    pub fn parse(attrs: &[Attribute]) -> syn::Result<Self> {
         let mut attributes = Self::default();
 
         for attr in attrs {
-            if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
-                /* todo
-                if meta_list.path.is_ident("elm_rs") {
-                }
-                */
-                #[cfg(feature = "serde")]
-                if meta_list.path.is_ident("serde") {
-                    attributes.serde.parse(meta_list);
-                }
+            #[cfg(feature = "serde")]
+            if attr.path().is_ident("serde") {
+                attributes.serde.parse(attr)?;
             }
         }
 
-        attributes
+        Ok(attributes)
     }
 }
 
@@ -61,21 +49,17 @@ pub struct FieldAttributes {
 }
 
 impl FieldAttributes {
-    pub fn parse(attrs: &[Attribute]) -> Self {
+    pub fn parse(attrs: &[Attribute]) -> syn::Result<Self> {
         let mut attributes = Self::default();
+
         for attr in attrs {
-            if let Ok(Meta::List(meta_list)) = attr.parse_meta() {
-                /* todo
-                if meta_list.path.is_ident("elm_rs") {
-                }
-                */
-                #[cfg(feature = "serde")]
-                if meta_list.path.is_ident("serde") {
-                    attributes.serde.parse(meta_list);
-                }
+            #[cfg(feature = "serde")]
+            if attr.path().is_ident("serde") {
+                attributes.serde.parse(attr)?;
             }
         }
-        attributes
+
+        Ok(attributes)
     }
 }
 
@@ -86,7 +70,7 @@ pub mod serde {
         ToSnakeCase,
     };
     use proc_macro2::Ident;
-    use syn::{Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
+    use syn::{token, Attribute, LitStr, Token};
 
     #[derive(Clone, Copy)]
     pub enum RenameAll {
@@ -131,87 +115,143 @@ pub mod serde {
 
     #[derive(Default)]
     pub struct ContainerAttributes {
+        pub rename: Option<String>,
+        pub rename_deserialize: Option<String>,
+        pub rename_serialize: Option<String>,
         pub rename_all: Option<RenameAll>,
         pub rename_all_deserialize: Option<RenameAll>,
         pub rename_all_serialize: Option<RenameAll>,
+        pub rename_all_fields: Option<RenameAll>,
+        pub rename_all_fields_deserialize: Option<RenameAll>,
+        pub rename_all_fields_serialize: Option<RenameAll>,
         pub enum_representation: EnumRepresentation,
         pub transparent: bool,
     }
 
     impl ContainerAttributes {
-        pub fn parse(&mut self, meta_list: MetaList) {
-            let mut nested = meta_list.nested.into_iter().peekable();
-            match nested.next() {
-                Some(NestedMeta::Meta(Meta::List(list))) => {
-                    if list.path.is_ident("rename_all") {
-                        for nested in list.nested {
-                            if let NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                                path,
-                                lit: Lit::Str(rename),
-                                ..
-                            })) = nested
-                            {
-                                let rename = RenameAll::from(&rename.value());
-                                if path.is_ident("deserialize") {
-                                    self.rename_all_deserialize = rename;
-                                } else if path.is_ident("serialize") {
-                                    self.rename_all_serialize = rename;
+        pub fn parse(&mut self, attr: &Attribute) -> syn::Result<()> {
+            let mut tag_attr = None;
+            let mut content_attr = None;
+
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("rename") {
+                    // rename(..) or rename = ".."
+                    if meta.input.peek(token::Paren) {
+                        // rename(..)
+                        meta.parse_nested_meta(|meta| {
+                            if meta.input.parse::<Token![=]>().is_ok() {
+                                if meta.path.is_ident("deserialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_deserialize = Some(content.value());
+                                }
+
+                                if meta.path.is_ident("serialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_serialize = Some(content.value());
                                 }
                             }
-                        }
+
+                            Ok(())
+                        })?;
+                    } else if meta.input.parse::<Token![=]>().is_ok() {
+                        // rename = ".."
+                        let content = meta.input.parse::<LitStr>()?;
+                        self.rename = Some(content.value());
                     }
                 }
-                Some(NestedMeta::Meta(Meta::NameValue(name_value))) => {
-                    if name_value.path.is_ident("rename_all") {
-                        if let Lit::Str(rename_all) = name_value.lit {
-                            self.rename_all = RenameAll::from(&rename_all.value())
-                        }
-                    } else if name_value.path.is_ident("tag") {
-                        if let Lit::Str(tag) = name_value.lit {
-                            if let Some(NestedMeta::Meta(Meta::NameValue(inner_name_value))) =
-                                nested.next()
-                            {
-                                if inner_name_value.path.is_ident("content") {
-                                    if let Lit::Str(content) = inner_name_value.lit {
-                                        self.enum_representation = EnumRepresentation::Adjacent {
-                                            tag: tag.value(),
-                                            content: content.value(),
-                                        };
-                                    }
+
+                if meta.path.is_ident("rename_all") {
+                    // rename_all(..) or rename_all = ".."
+                    if meta.input.peek(token::Paren) {
+                        // rename_all(..)
+                        meta.parse_nested_meta(|meta| {
+                            if meta.input.parse::<Token![=]>().is_ok() {
+                                if meta.path.is_ident("deserialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_all_deserialize = RenameAll::from(&content.value());
                                 }
-                            } else {
-                                self.enum_representation =
-                                    EnumRepresentation::Internal { tag: tag.value() };
-                            }
-                        }
-                    } else if name_value.path.is_ident("content") {
-                        if let Lit::Str(content) = name_value.lit {
-                            if let Some(NestedMeta::Meta(Meta::NameValue(inner_name_value))) =
-                                nested.next()
-                            {
-                                if inner_name_value.path.is_ident("tag") {
-                                    if let Lit::Str(tag) = inner_name_value.lit {
-                                        self.enum_representation = EnumRepresentation::Adjacent {
-                                            tag: tag.value(),
-                                            content: content.value(),
-                                        };
-                                    }
+
+                                if meta.path.is_ident("serialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_all_serialize = RenameAll::from(&content.value());
                                 }
                             }
-                        }
+
+                            Ok(())
+                        })?;
+                    } else if meta.input.parse::<Token![=]>().is_ok() {
+                        // rename_all = ".."
+                        let content = meta.input.parse::<LitStr>()?;
+                        self.rename_all = RenameAll::from(&content.value());
                     }
                 }
-                Some(NestedMeta::Meta(Meta::Path(Path { segments, .. }))) => {
-                    for segment in segments {
-                        match segment.ident.to_string().as_str() {
-                            "transparent" => self.transparent = true,
-                            "untagged" => self.enum_representation = EnumRepresentation::Untagged,
-                            _ => {}
-                        }
+
+                if meta.path.is_ident("rename_all_fields") {
+                    // rename_all_fields(..) or rename_all_fields = ".."
+                    if meta.input.peek(token::Paren) {
+                        // rename_all_fields(..)
+                        meta.parse_nested_meta(|meta| {
+                            if meta.input.parse::<Token![=]>().is_ok() {
+                                if meta.path.is_ident("deserialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_all_fields_deserialize =
+                                        RenameAll::from(&content.value());
+                                }
+
+                                if meta.path.is_ident("serialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_all_fields_serialize =
+                                        RenameAll::from(&content.value());
+                                }
+                            }
+
+                            Ok(())
+                        })?;
+                    } else if meta.input.parse::<Token![=]>().is_ok() {
+                        // rename_all_fields = ".."
+                        let content = meta.input.parse::<LitStr>()?;
+                        self.rename_all_fields = RenameAll::from(&content.value());
                     }
                 }
-                _ => {}
+
+                if meta.path.is_ident("tag") {
+                    // tag = ".."
+                    if meta.input.parse::<Token![=]>().is_ok() {
+                        let content = meta.input.parse::<LitStr>()?;
+                        tag_attr = Some(content.value());
+                    }
+                }
+
+                if meta.path.is_ident("content") {
+                    // content = ".."
+                    if meta.input.parse::<Token![=]>().is_ok() {
+                        let content = meta.input.parse::<LitStr>()?;
+                        content_attr = Some(content.value());
+                    }
+                }
+
+                if meta.path.is_ident("untagged") {
+                    // untagged
+                    self.enum_representation = EnumRepresentation::Untagged;
+                }
+
+                if meta.path.is_ident("transparent") {
+                    self.transparent = true;
+                }
+
+                // we don't need to handle all serde attributes
+                Ok(())
+            })?;
+
+            if let Some(tag) = tag_attr {
+                if let Some(content) = content_attr {
+                    self.enum_representation = EnumRepresentation::Adjacent { tag, content };
+                } else {
+                    self.enum_representation = EnumRepresentation::Internal { tag };
+                }
             }
+
+            Ok(())
         }
     }
 
@@ -229,69 +269,78 @@ pub mod serde {
     }
 
     impl VariantAttributes {
-        pub fn parse(&mut self, meta_list: MetaList) {
-            let mut nested = meta_list.nested.into_iter();
-            match nested.next() {
-                Some(NestedMeta::Meta(Meta::List(list))) => {
-                    if list.path.is_ident("rename") {
-                        for nested in list.nested {
-                            if let NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                                path,
-                                lit: Lit::Str(rename),
-                                ..
-                            })) = nested
-                            {
-                                if path.is_ident("deserialize") {
-                                    self.rename_deserialize = Some(rename.value());
-                                } else if path.is_ident("serialize") {
-                                    self.rename_serialize = Some(rename.value());
+        pub fn parse(&mut self, attr: &Attribute) -> syn::Result<()> {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("rename") {
+                    // rename(..) or rename = ".."
+                    if meta.input.peek(token::Paren) {
+                        // rename(..)
+                        meta.parse_nested_meta(|meta| {
+                            if meta.input.parse::<Token![=]>().is_ok() {
+                                if meta.path.is_ident("deserialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_deserialize = Some(content.value());
+                                }
+
+                                if meta.path.is_ident("serialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_serialize = Some(content.value());
                                 }
                             }
-                        }
-                    } else if list.path.is_ident("rename_all") {
-                        for nested in list.nested {
-                            if let NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                                path,
-                                lit: Lit::Str(rename),
-                                ..
-                            })) = nested
-                            {
-                                let rename = RenameAll::from(&rename.value());
-                                if path.is_ident("deserialize") {
-                                    self.rename_all_deserialize = rename;
-                                } else if path.is_ident("serialize") {
-                                    self.rename_all_serialize = rename;
+
+                            Ok(())
+                        })?;
+                    } else if meta.input.parse::<Token![=]>().is_ok() {
+                        // rename = ".."
+                        let content = meta.input.parse::<LitStr>()?;
+                        self.rename = Some(content.value());
+                    }
+                }
+
+                if meta.path.is_ident("alias") && meta.input.parse::<Token![=]>().is_ok() {
+                    // alias = ".."
+                    let content = meta.input.parse::<LitStr>()?;
+                    self.aliases.push(content.value());
+                }
+
+                if meta.path.is_ident("rename_all") {
+                    // rename_all(..) or rename_all = ".."
+                    if meta.input.peek(token::Paren) {
+                        // rename_all(..)
+                        meta.parse_nested_meta(|meta| {
+                            if meta.input.parse::<Token![=]>().is_ok() {
+                                if meta.path.is_ident("deserialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_all_deserialize = RenameAll::from(&content.value());
+                                }
+
+                                if meta.path.is_ident("serialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_all_serialize = RenameAll::from(&content.value());
                                 }
                             }
-                        }
+
+                            Ok(())
+                        })?;
+                    } else if meta.input.parse::<Token![=]>().is_ok() {
+                        // rename_all = ".."
+                        let content = meta.input.parse::<LitStr>()?;
+                        self.rename_all = RenameAll::from(&content.value());
                     }
                 }
-                Some(NestedMeta::Meta(Meta::NameValue(name_value))) => {
-                    if name_value.path.is_ident("rename") {
-                        if let Lit::Str(rename) = name_value.lit {
-                            self.rename = Some(rename.value())
-                        }
-                    } else if name_value.path.is_ident("rename_all") {
-                        if let Lit::Str(rename_all) = name_value.lit {
-                            self.rename_all = RenameAll::from(&rename_all.value())
-                        }
-                    } else if name_value.path.is_ident("alias") {
-                        if let Lit::Str(rename_all) = name_value.lit {
-                            self.aliases.push(rename_all.value());
-                        }
-                    }
+
+                if meta.path.is_ident("skip") {
+                    self.skip = true;
                 }
-                Some(NestedMeta::Meta(Meta::Path(Path { segments, .. }))) => {
-                    for segment in segments {
-                        match segment.ident.to_string().as_str() {
-                            "other" => self.other = true,
-                            "skip" => self.skip = true,
-                            _ => {}
-                        }
-                    }
+
+                if meta.path.is_ident("other") {
+                    self.other = true;
                 }
-                _ => {}
-            }
+
+                Ok(())
+            })?;
+
+            Ok(())
         }
     }
 
@@ -306,47 +355,52 @@ pub mod serde {
     }
 
     impl FieldAttributes {
-        pub fn parse(&mut self, meta_list: MetaList) {
-            let mut nested = meta_list.nested.into_iter();
-            match nested.next() {
-                Some(NestedMeta::Meta(Meta::List(list))) => {
-                    if list.path.is_ident("rename") {
-                        for nested in list.nested {
-                            if let NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                                path,
-                                lit: Lit::Str(rename),
-                                ..
-                            })) = nested
-                            {
-                                if path.is_ident("deserialize") {
-                                    self.rename_deserialize = Some(rename.value());
-                                } else if path.is_ident("serialize") {
-                                    self.rename_serialize = Some(rename.value());
+        pub fn parse(&mut self, attr: &Attribute) -> syn::Result<()> {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("rename") {
+                    // rename(..) or rename = ".."
+                    if meta.input.peek(token::Paren) {
+                        // rename(..)
+                        meta.parse_nested_meta(|meta| {
+                            if meta.input.parse::<Token![=]>().is_ok() {
+                                if meta.path.is_ident("deserialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_deserialize = Some(content.value());
+                                }
+
+                                if meta.path.is_ident("serialize") {
+                                    let content = meta.input.parse::<LitStr>()?;
+                                    self.rename_serialize = Some(content.value());
                                 }
                             }
-                        }
+
+                            Ok(())
+                        })?;
+                    } else if meta.input.parse::<Token![=]>().is_ok() {
+                        // rename = ".."
+                        let content = meta.input.parse::<LitStr>()?;
+                        self.rename = Some(content.value());
                     }
                 }
-                Some(NestedMeta::Meta(Meta::NameValue(name_value))) => {
-                    if name_value.path.is_ident("rename") {
-                        if let Lit::Str(rename) = name_value.lit {
-                            self.rename = Some(rename.value())
-                        }
-                    } else if name_value.path.is_ident("alias") {
-                        if let Lit::Str(rename_all) = name_value.lit {
-                            self.aliases.push(rename_all.value());
-                        }
-                    }
+
+                if meta.path.is_ident("alias") && meta.input.parse::<Token![=]>().is_ok() {
+                    // alias = ".."
+                    let content = meta.input.parse::<LitStr>()?;
+                    self.aliases.push(content.value());
                 }
-                Some(NestedMeta::Meta(Meta::Path(path))) => {
-                    if path.is_ident("flatten") {
-                        self.flatten = true
-                    } else if path.is_ident("skip") {
-                        self.skip = true
-                    }
+
+                if meta.path.is_ident("flatten") {
+                    self.flatten = true;
                 }
-                _ => {}
-            }
+
+                if meta.path.is_ident("skip") {
+                    self.skip = true;
+                }
+
+                Ok(())
+            })?;
+
+            Ok(())
         }
     }
 
@@ -362,5 +416,255 @@ pub mod serde {
             content: String,
         },
         Untagged,
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        #[test]
+        fn parses_container_rename() {
+            let mut ca = ContainerAttributes::default();
+
+            ca.parse(&syn::parse_quote!(#[serde(rename = "re")]))
+                .unwrap();
+            assert_eq!(ca.rename, Some("re".to_string()));
+
+            ca.parse(&syn::parse_quote!(#[serde(rename(deserialize = "de"))]))
+                .unwrap();
+            assert_eq!(ca.rename_deserialize, Some("de".to_string()));
+
+            ca.parse(&syn::parse_quote!(#[serde(rename(serialize = "se"))]))
+                .unwrap();
+            assert_eq!(ca.rename_serialize, Some("se".to_string()));
+
+            ca.parse(&syn::parse_quote!(#[serde(rename(deserialize = "de2", serialize = "se2"))]))
+                .unwrap();
+            assert_eq!(ca.rename_deserialize, Some("de2".to_string()));
+            assert_eq!(ca.rename_serialize, Some("se2".to_string()));
+        }
+
+        #[test]
+        fn parses_container_rename_all() {
+            let mut ca = ContainerAttributes::default();
+
+            ca.parse(&syn::parse_quote!(#[serde(rename_all = "UPPERCASE")]))
+                .unwrap();
+            assert!(matches!(ca.rename_all, Some(RenameAll::Uppercase)));
+
+            ca.parse(&syn::parse_quote!(#[serde(rename_all(deserialize = "UPPERCASE"))]))
+                .unwrap();
+            assert!(matches!(
+                ca.rename_all_deserialize,
+                Some(RenameAll::Uppercase)
+            ));
+
+            ca.parse(&syn::parse_quote!(#[serde(rename_all(serialize = "UPPERCASE"))]))
+                .unwrap();
+            assert!(matches!(
+                ca.rename_all_serialize,
+                Some(RenameAll::Uppercase)
+            ));
+
+            ca.parse(&syn::parse_quote!(#[serde(rename_all(deserialize = "lowercase", serialize = "lowercase"))]))
+                .unwrap();
+            assert!(matches!(
+                ca.rename_all_deserialize,
+                Some(RenameAll::Lowercase)
+            ));
+            assert!(matches!(
+                ca.rename_all_serialize,
+                Some(RenameAll::Lowercase)
+            ));
+        }
+
+        #[test]
+        fn parses_container_rename_all_fields() {
+            let mut ca = ContainerAttributes::default();
+
+            ca.parse(&syn::parse_quote!(#[serde(rename_all_fields = "UPPERCASE")]))
+                .unwrap();
+            assert!(matches!(ca.rename_all_fields, Some(RenameAll::Uppercase)));
+
+            ca.parse(&syn::parse_quote!(#[serde(rename_all_fields(deserialize = "UPPERCASE"))]))
+                .unwrap();
+            assert!(matches!(
+                ca.rename_all_fields_deserialize,
+                Some(RenameAll::Uppercase)
+            ));
+
+            ca.parse(&syn::parse_quote!(#[serde(rename_all_fields(serialize = "UPPERCASE"))]))
+                .unwrap();
+            assert!(matches!(
+                ca.rename_all_fields_serialize,
+                Some(RenameAll::Uppercase)
+            ));
+
+            ca.parse(&syn::parse_quote!(#[serde(rename_all_fields(deserialize = "lowercase", serialize = "lowercase"))]))
+                .unwrap();
+            assert!(matches!(
+                ca.rename_all_fields_deserialize,
+                Some(RenameAll::Lowercase)
+            ));
+            assert!(matches!(
+                ca.rename_all_fields_serialize,
+                Some(RenameAll::Lowercase)
+            ));
+        }
+
+        #[test]
+        fn parses_container_enum_representation() {
+            let mut ca = ContainerAttributes::default();
+
+            ca.parse(&syn::parse_quote!(#[serde(tag = "t")])).unwrap();
+            if let EnumRepresentation::Internal { tag } = &ca.enum_representation {
+                assert_eq!(tag, "t");
+            } else {
+                panic!("failed to parse tag");
+            }
+
+            ca.parse(&syn::parse_quote!(#[serde(tag = "t", content = "c")]))
+                .unwrap();
+            if let EnumRepresentation::Adjacent { tag, content } = &ca.enum_representation {
+                assert_eq!(tag, "t");
+                assert_eq!(content, "c");
+            } else {
+                panic!("failed to parse tag and content");
+            }
+
+            ca.parse(&syn::parse_quote!(#[serde(untagged)])).unwrap();
+            assert!(matches!(
+                ca.enum_representation,
+                EnumRepresentation::Untagged
+            ));
+        }
+
+        #[test]
+        fn parses_variant_rename() {
+            let mut va = VariantAttributes::default();
+
+            va.parse(&syn::parse_quote!(#[serde(rename = "re")]))
+                .unwrap();
+            assert_eq!(va.rename, Some("re".to_string()));
+
+            va.parse(&syn::parse_quote!(#[serde(rename(deserialize = "de"))]))
+                .unwrap();
+            assert_eq!(va.rename_deserialize, Some("de".to_string()));
+
+            va.parse(&syn::parse_quote!(#[serde(rename(serialize = "se"))]))
+                .unwrap();
+            assert_eq!(va.rename_serialize, Some("se".to_string()));
+
+            va.parse(&syn::parse_quote!(#[serde(rename(deserialize = "de2", serialize = "se2"))]))
+                .unwrap();
+            assert_eq!(va.rename_deserialize, Some("de2".to_string()));
+            assert_eq!(va.rename_serialize, Some("se2".to_string()));
+        }
+
+        #[test]
+        fn parses_variant_rename_all() {
+            let mut va = VariantAttributes::default();
+
+            va.parse(&syn::parse_quote!(#[serde(rename_all = "UPPERCASE")]))
+                .unwrap();
+            assert!(matches!(va.rename_all, Some(RenameAll::Uppercase)));
+
+            va.parse(&syn::parse_quote!(#[serde(rename_all(deserialize = "UPPERCASE"))]))
+                .unwrap();
+            assert!(matches!(
+                va.rename_all_deserialize,
+                Some(RenameAll::Uppercase)
+            ));
+
+            va.parse(&syn::parse_quote!(#[serde(rename_all(serialize = "UPPERCASE"))]))
+                .unwrap();
+            assert!(matches!(
+                va.rename_all_serialize,
+                Some(RenameAll::Uppercase)
+            ));
+
+            va.parse(&syn::parse_quote!(#[serde(rename_all(deserialize = "lowercase", serialize = "lowercase"))]))
+                .unwrap();
+            assert!(matches!(
+                va.rename_all_deserialize,
+                Some(RenameAll::Lowercase)
+            ));
+            assert!(matches!(
+                va.rename_all_serialize,
+                Some(RenameAll::Lowercase)
+            ));
+        }
+
+        #[test]
+        fn parses_variant_aliases() {
+            let mut va = VariantAttributes::default();
+            va.parse(&syn::parse_quote!(#[serde(alias = "a")])).unwrap();
+            assert_eq!(va.aliases[0], "a");
+            va.parse(&syn::parse_quote!(#[serde(alias = "a1", alias = "a2")]))
+                .unwrap();
+            assert_eq!(va.aliases[1], "a1");
+            assert_eq!(va.aliases[2], "a2");
+        }
+
+        #[test]
+        fn parses_variant_skip() {
+            let mut va = VariantAttributes::default();
+            va.parse(&syn::parse_quote!(#[serde(skip)])).unwrap();
+            assert!(va.skip);
+        }
+
+        #[test]
+        fn parses_variant_other() {
+            let mut va = VariantAttributes::default();
+            va.parse(&syn::parse_quote!(#[serde(other)])).unwrap();
+            assert!(va.other);
+        }
+
+        #[test]
+        fn parses_field_rename() {
+            let mut fa = FieldAttributes::default();
+
+            fa.parse(&syn::parse_quote!(#[serde(rename = "re")]))
+                .unwrap();
+            assert_eq!(fa.rename, Some("re".to_string()));
+
+            fa.parse(&syn::parse_quote!(#[serde(rename(deserialize = "de"))]))
+                .unwrap();
+            assert_eq!(fa.rename_deserialize, Some("de".to_string()));
+
+            fa.parse(&syn::parse_quote!(#[serde(rename(serialize = "se"))]))
+                .unwrap();
+            assert_eq!(fa.rename_serialize, Some("se".to_string()));
+
+            fa.parse(&syn::parse_quote!(#[serde(rename(deserialize = "de2", serialize = "se2"))]))
+                .unwrap();
+            assert_eq!(fa.rename_deserialize, Some("de2".to_string()));
+            assert_eq!(fa.rename_serialize, Some("se2".to_string()));
+        }
+
+        #[test]
+        fn parses_field_aliases() {
+            let mut fa = FieldAttributes::default();
+            fa.parse(&syn::parse_quote!(#[serde(alias = "a")])).unwrap();
+            assert_eq!(fa.aliases[0], "a");
+            fa.parse(&syn::parse_quote!(#[serde(alias = "a1", alias = "a2")]))
+                .unwrap();
+            assert_eq!(fa.aliases[1], "a1");
+            assert_eq!(fa.aliases[2], "a2");
+        }
+
+        #[test]
+        fn parses_field_flatten() {
+            let mut fa = FieldAttributes::default();
+            fa.parse(&syn::parse_quote!(#[serde(flatten)])).unwrap();
+            assert!(fa.flatten);
+        }
+
+        #[test]
+        fn parses_field_skip() {
+            let mut fa = FieldAttributes::default();
+            fa.parse(&syn::parse_quote!(#[serde(skip)])).unwrap();
+            assert!(fa.skip);
+        }
     }
 }
