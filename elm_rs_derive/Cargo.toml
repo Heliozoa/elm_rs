@@ -1,6 +1,6 @@
 [package]
 name = "elm_rs_derive"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Heliozoa <daniel.x.martinez@helsinki.fi>"]
 edition = "2021"
 rust-version = "1.56"
