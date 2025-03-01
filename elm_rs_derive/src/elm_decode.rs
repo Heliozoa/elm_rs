@@ -32,7 +32,7 @@ fn intermediate_to_token_stream(
         type_info,
         container_attributes,
     }: Intermediate,
-) -> Result<TokenStream2, syn::Error> {
+) -> syn::Result<TokenStream2> {
     let decoder_type = format!("{}Decoder", elm_type.to_lower_camel_case());
 
     let decoder = match type_info {
@@ -300,7 +300,7 @@ fn enum_internal(
     variants: Vec<EnumVariant>,
     tag: &str,
     container_attributes: &ContainerAttributes,
-) -> Result<TokenStream2, syn::Error> {
+) -> syn::Result<TokenStream2> {
     let mut decoders = vec![];
     let mut constructors = vec![];
     let mut other_decoder = None;
@@ -410,7 +410,7 @@ fn enum_adjacent(
     tag: &str,
     content: &str,
     container_attributes: &ContainerAttributes,
-) -> Result<TokenStream2, syn::Error> {
+) -> syn::Result<TokenStream2> {
     let mut decoders = vec![];
     let mut constructors = vec![];
     let mut other_decoder = None;
@@ -512,7 +512,7 @@ fn enum_untagged(
     decoder_name: &str,
     variants: Vec<EnumVariant>,
     container_attributes: &ContainerAttributes,
-) -> Result<TokenStream2, syn::Error> {
+) -> syn::Result<TokenStream2> {
     let mut decoders = vec![];
     let mut constructors = vec![];
     for variant in variants {

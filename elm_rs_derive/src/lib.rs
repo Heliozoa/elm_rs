@@ -110,10 +110,7 @@ enum TypeInfo {
 }
 
 impl TypeInfo {
-    pub fn parse(
-        data: Data,
-        container_attributes: &ContainerAttributes,
-    ) -> Result<Self, syn::Error> {
+    pub fn parse(data: Data, container_attributes: &ContainerAttributes) -> syn::Result<Self> {
         let type_info = match data {
             Data::Struct(data_struct) => match data_struct.fields {
                 Fields::Unit => TypeInfo::Unit,
@@ -132,7 +129,7 @@ impl TypeInfo {
                     if transparent && named.named.len() == 1 {
                         TypeInfo::Newtype(Box::new(named.named.into_iter().next().unwrap().ty))
                     } else {
-                        TypeInfo::Struct(StructField::parse(named))
+                        TypeInfo::Struct(StructField::parse(named)?)
                     }
                 }
             },
@@ -230,25 +227,24 @@ impl StructField {
         self.ident.to_string()
     }
 
-    fn parse(fields: FieldsNamed) -> Vec<Self> {
-        let fields = fields.named.into_iter().map(|field| {
-            let field_attributes = FieldAttributes::parse(&field.attrs).unwrap();
-            (field, field_attributes)
-        });
-        #[cfg(feature = "serde")]
-        let fields = fields.filter(|(_, field_attributes)| !field_attributes.serde.skip);
-        fields
-            .map(|(field, field_attributes)| {
-                StructField {
-                    ident: field.ident.unwrap(), // only tuple struct fields are unnamed
-                    // todo
-                    // aliases: field_attributes.serde.aliases,
-                    ty: field.ty.to_token_stream(),
-                    #[cfg(feature = "serde")]
-                    serde_attributes: field_attributes.serde,
-                }
-            })
-            .collect()
+    fn parse(fields: FieldsNamed) -> syn::Result<Vec<Self>> {
+        let mut parsed = Vec::new();
+        for field in fields.named {
+            let attributes = FieldAttributes::parse(&field.attrs)?;
+            #[cfg(feature = "serde")]
+            if attributes.serde.skip {
+                continue;
+            }
+            parsed.push(StructField {
+                ident: field.ident.unwrap(), // only tuple struct fields are unnamed
+                // todo
+                // aliases: field_attributes.serde.aliases,
+                ty: field.ty.to_token_stream(),
+                #[cfg(feature = "serde")]
+                serde_attributes: attributes.serde,
+            });
+        }
+        Ok(parsed)
     }
 }
 
@@ -337,7 +333,7 @@ impl EnumVariant {
                     .map(|field| field.ty.to_token_stream())
                     .collect(),
             ),
-            Fields::Named(named) => EnumVariantKind::Struct(StructField::parse(named)),
+            Fields::Named(named) => EnumVariantKind::Struct(StructField::parse(named)?),
         };
         let variant = EnumVariant {
             ident: variant.ident,

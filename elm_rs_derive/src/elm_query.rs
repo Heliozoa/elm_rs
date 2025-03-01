@@ -28,7 +28,7 @@ fn intermediate_to_token_stream(
         type_info,
         container_attributes,
     }: Intermediate,
-) -> Result<TokenStream2, syn::Error> {
+) -> syn::Result<TokenStream2> {
     let ts = match type_info {
         TypeInfo::Struct(fields) => {
             let mut query_fields = vec![];

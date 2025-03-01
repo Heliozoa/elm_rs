@@ -32,7 +32,7 @@ fn intermediate_to_token_stream(
         type_info,
         container_attributes,
     }: Intermediate,
-) -> Result<TokenStream2, syn::Error> {
+) -> syn::Result<TokenStream2> {
     let encoder_type = format!("{}Encoder", elm_type.to_lower_camel_case());
 
     let encoder = match type_info {
@@ -285,7 +285,7 @@ fn enum_internal(
     variants: Vec<EnumVariant>,
     tag: &str,
     container_attributes: &ContainerAttributes,
-) -> Result<TokenStream2, syn::Error> {
+) -> syn::Result<TokenStream2> {
     let mut encoders = vec![];
     for variant in variants {
         #[cfg(feature = "serde")]
@@ -358,7 +358,7 @@ fn enum_adjacent(
     tag: &str,
     content: &str,
     container_attributes: &ContainerAttributes,
-) -> Result<TokenStream2, syn::Error> {
+) -> syn::Result<TokenStream2> {
     let mut encoders = vec![];
     for variant in variants {
         #[cfg(feature = "serde")]
@@ -424,7 +424,7 @@ fn enum_untagged(
     encoder_name: &str,
     variants: Vec<EnumVariant>,
     container_attributes: &ContainerAttributes,
-) -> Result<TokenStream2, syn::Error> {
+) -> syn::Result<TokenStream2> {
     let mut encoders = vec![];
     for variant in variants {
         #[cfg(feature = "serde")]
