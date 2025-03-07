@@ -108,7 +108,7 @@ fn enum_type(elm_type: &str, enum_variants: Vec<EnumVariant>) -> TokenStream2 {
     for enum_variant in enum_variants {
         let variant_elm_name = enum_variant.name_elm();
         match &enum_variant.variant {
-            EnumVariantKind::Unit { .. } => {
+            EnumVariantKind::Unit => {
                 let field = quote! {
                     #variant_elm_name
                 };
