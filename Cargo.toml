@@ -5,6 +5,13 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+authors = ["Heliozoa <daniel.x.martinez@helsinki.fi>"]
+edition = "2024"
+license = "MPL-2.0"
+repository = "https://github.com/Heliozoa/elm_rs"
+rust-version = "1.85"
+version = "0.2.3"
 
 [patch.crates-io]
 elm_rs = { path = "elm_rs" }

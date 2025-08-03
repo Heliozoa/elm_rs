@@ -18,8 +18,8 @@ use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::ToTokens;
 use std::borrow::Cow;
 use syn::{
-    punctuated::Punctuated, spanned::Spanned, Data, DataEnum, DeriveInput, Fields, FieldsNamed,
-    Generics, Ident, Type, Variant,
+    Data, DataEnum, DeriveInput, Fields, FieldsNamed, Generics, Ident, Type, Variant,
+    punctuated::Punctuated, spanned::Spanned,
 };
 
 /// Derive `Elm`.
@@ -155,7 +155,7 @@ impl TypeInfo {
                 return Err(syn::Error::new(
                     union.union_token.span(),
                     "unions are not supported",
-                ))
+                ));
             }
         };
         Ok(type_info)

@@ -3,12 +3,12 @@
 use super::{EnumVariantKind, Intermediate, TypeInfo};
 #[cfg(feature = "serde")]
 use crate::attributes::serde::EnumRepresentation;
-use crate::{attributes::ContainerAttributes, EnumVariant, StructField};
+use crate::{EnumVariant, StructField, attributes::ContainerAttributes};
 use heck::ToLowerCamelCase;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Type};
+use syn::{DeriveInput, Type, parse_macro_input};
 
 pub fn derive(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
@@ -327,13 +327,13 @@ _ ->
                 return Err(syn::Error::new(
                     variant.span,
                     "Internally tagged newtype variants are not supported by serde_json",
-                ))
+                ));
             }
             EnumVariantKind::Tuple(_) => {
                 return Err(syn::Error::new(
                     variant.span,
                     "Internally tagged tuple variants are not supported by serde_json",
-                ))
+                ));
             }
             EnumVariantKind::Struct(fields) => {
                 let (decoder, constructor) = enum_variant_struct_internal(

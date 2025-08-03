@@ -8,7 +8,7 @@ use std::{
     num::*,
     path::PathBuf,
     rc::Rc,
-    sync::{atomic::*, Arc, Mutex, RwLock},
+    sync::{Arc, Mutex, RwLock, atomic::*},
     time::{Duration, SystemTime},
 };
 

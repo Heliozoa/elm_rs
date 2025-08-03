@@ -1,5 +1,5 @@
 use crate::{Elm, ElmDecode, ElmEncode, ElmQuery, ElmQueryField};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::{
     fmt::Debug,
     io::Write,

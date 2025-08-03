@@ -4,7 +4,7 @@ use super::{EnumVariant, EnumVariantKind, Intermediate, StructField, TypeInfo};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Type};
+use syn::{DeriveInput, Type, parse_macro_input};
 
 pub fn derive(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
@@ -92,7 +92,7 @@ fn struct_type(elm_type: &str, fields: Vec<StructField>) -> TokenStream2 {
 type alias {elm_type} =
     {{ {fields}
     }}
-", 
+",
         elm_type = #elm_type,
         fields =
             (
@@ -153,7 +153,7 @@ fn enum_type(elm_type: &str, enum_variants: Vec<EnumVariant>) -> TokenStream2 {
     quote! {::std::format!("\
 type {elm_type}
     = {enum_fields}
-", 
+",
         elm_type = #elm_type,
         enum_fields =
             (

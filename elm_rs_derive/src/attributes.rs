@@ -70,7 +70,7 @@ pub mod serde {
         ToSnakeCase,
     };
     use proc_macro2::Ident;
-    use syn::{token, Attribute, LitStr, Token};
+    use syn::{Attribute, LitStr, Token, token};
 
     #[derive(Clone, Copy)]
     pub enum RenameAll {
