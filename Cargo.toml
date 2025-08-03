@@ -1,8 +1,5 @@
 [workspace]
-members = [
-    "elm_rs",
-    "elm_rs_derive"
-]
+members = ["elm_rs", "elm_rs_derive"]
 resolver = "2"
 
 [workspace.package]
