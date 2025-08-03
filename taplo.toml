@@ -1,0 +1,13 @@
+# Configuration file for https://crates.io/crates/taplo-cli
+# Format toml files with `taplo fmt`
+
+[formatting]
+align_comments = false
+reorder_keys = true
+
+[[rule]]
+include = ["**/Cargo.toml"]
+keys = ["package"]
+
+[rule.formatting]
+reorder_keys = false
